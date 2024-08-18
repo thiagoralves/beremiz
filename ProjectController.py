@@ -2326,6 +2326,7 @@ class ProjectController(ConfigTreeNode, PLCControler):
             if os.path.exists(arduino_ext_path):
                 f = open(arduino_ext_path)
                 arduino_ext_contents = f.read()
+                f.close()
 
             dialog = ArduinoUploadDialog.ArduinoUploadDialog(self.AppFrame, program, arduino_ext_contents, MD5, self)
             dialog.ShowModal()
