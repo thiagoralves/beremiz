@@ -5,3 +5,5 @@
 *.cpp text
 *.cc text
 *.h text
+# this stays inactive, until it is activated locally in the git configuration, see README_JSON-Tools.md
+*.json diff=json
