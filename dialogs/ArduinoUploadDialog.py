@@ -83,36 +83,31 @@ class ArduinoUploadDialog(wx.Dialog):
         top_sizer.Add(self.m_staticText1, pos=(0,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
 
         self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), board_type_comboChoices, 0)
-        top_sizer.Add(self.board_type_combo, pos=(0,1), flag=wx.ALL | wx.EXPAND, border=5)
+        top_sizer.Add(self.board_type_combo, pos=(0,1), flag=wx.ALL | wx.EXPAND, border=0)
 
-        # Placeholder for the first row, third column
-        top_sizer.Add((0, 0), pos=(0,2), flag=wx.EXPAND, border=5)
+        # # Placeholder for the first row, third column
+        # top_sizer.Add((0, 0), pos=(0,2), flag=wx.EXPAND, border=5)
 
-        # COM Port
-        self.m_staticText2 = wx.StaticText(top_panel, wx.ID_ANY, _('COM Port'), wx.DefaultPosition, wx.Size(label_width, -1), 0)
-        self.m_staticText2.Wrap(-1)
-        top_sizer.Add(self.m_staticText2, pos=(1,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
+        # # COM Port
+        # self.m_staticText2 = wx.StaticText(top_panel, wx.ID_ANY, _('COM Port'), wx.DefaultPosition, wx.Size(label_width, -1), 0)
+        # self.m_staticText2.Wrap(-1)
+        # top_sizer.Add(self.m_staticText2, pos=(1,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
 
-        self.com_port_combo = wx.ComboBox(top_panel, wx.ID_ANY, "COM1", wx.DefaultPosition, wx.Size(-1,-1), [""], 0)
-        top_sizer.Add(self.com_port_combo, pos=(1,1), flag=wx.ALL | wx.EXPAND, border=5)
+        # self.com_port_combo = wx.ComboBox(top_panel, wx.ID_ANY, "COM1", wx.DefaultPosition, wx.Size(-1,-1), [""], 0)
+        # top_sizer.Add(self.com_port_combo, pos=(1,1), flag=wx.ALL | wx.EXPAND, border=5)
 
-        button_size = self.com_port_combo.GetSize().GetHeight()
-        self.reload_button = wx.Button(top_panel, wx.ID_ANY, "\u21BB", wx.DefaultPosition, size=(button_size, button_size), style=wx.BU_EXACTFIT)
-        self.reload_button.SetToolTip(_('Reload COM port list'))
-        top_sizer.Add(self.reload_button, pos=(1,2), flag=wx.ALL, border=5)
+        # button_size = self.com_port_combo.GetSize().GetHeight()
+        # self.reload_button = wx.Button(top_panel, wx.ID_ANY, "\u21BB", wx.DefaultPosition, size=(button_size, button_size), style=wx.BU_EXACTFIT)
+        # self.reload_button.SetToolTip(_('Reload COM port list'))
+        # top_sizer.Add(self.reload_button, pos=(1,2), flag=wx.ALL, border=5)
 
         self.m_staticline1 = wx.StaticLine(top_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
-        top_sizer.Add(self.m_staticline1, pos=(2,0), span=(1,3), flag=wx.EXPAND, border=5)
+        top_sizer.Add(self.m_staticline1, pos=(1,0), span=(1,3), flag=wx.EXPAND, border=5)
 
         top_sizer.AddGrowableCol(1, 1)  # Make the middle column (index 1) growable
         top_panel.SetSizer(top_sizer)
         top_sizer.Fit(top_panel)
         main_sizer.Add(top_panel, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Bind events for Comboboxes and Button
-        self.board_type_combo.Bind(wx.EVT_COMBOBOX, self.onBoardChange)
-        self.com_port_combo.Bind(wx.EVT_COMBOBOX_DROPDOWN, self.reloadComboChoices)
-        self.reload_button.Bind(wx.EVT_BUTTON, self.reloadComboChoices)
 
         self.m_listbook2 = wx.Listbook(self, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LB_LEFT)
         m_listbook2ImageSize = wx.Size(100,100)
@@ -125,17 +120,32 @@ class ArduinoUploadDialog(wx.Dialog):
         # Create a vertical sizer as container for the widgets below
         bSizer21 = wx.BoxSizer(wx.VERTICAL)
 
-        # Create a horizontal sizer for the radio buttons
-        hSizer = wx.BoxSizer(wx.HORIZONTAL)
+        # Create a GridBagSizer for the COM port and control elements
+        gbs = wx.GridBagSizer(vgap=5, hgap=5)
+
+        # COM Port row
+        com_label = wx.StaticText(self.m_panel5, wx.ID_ANY, _('COM Port'), wx.DefaultPosition, wx.Size(100, -1), 0)
+        com_label.Wrap(-1)
+        gbs.Add(com_label, pos=(0,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
+
+        self.com_port_combo = wx.ComboBox(self.m_panel5, wx.ID_ANY, "COM1", wx.DefaultPosition, wx.Size(-1,-1), [""], 0)
+        gbs.Add(self.com_port_combo, pos=(0,1), flag=wx.ALL | wx.EXPAND, border=5)
+
+        button_size = self.com_port_combo.GetSize().GetHeight()
+        self.reload_button = wx.Button(self.m_panel5, wx.ID_ANY, "\u21BB", wx.DefaultPosition, size=(button_size, button_size), style=wx.BU_EXACTFIT)
+        self.reload_button.SetToolTip(_('Reload COM port list'))
+        gbs.Add(self.reload_button, pos=(0,2), flag=wx.ALL | wx.ALIGN_RIGHT, border=5)
+
+        # Bind events for Comboboxes and Button
+        self.board_type_combo.Bind(wx.EVT_COMBOBOX, self.onBoardChange)
+        self.com_port_combo.Bind(wx.EVT_COMBOBOX_DROPDOWN, self.reloadComboChoices)
+        self.reload_button.Bind(wx.EVT_BUTTON, self.reloadComboChoices)
 
         # Create compile only checkbox
         self.check_compile = wx.CheckBox(self.m_panel5, wx.ID_ANY, _('Compile Only'), wx.DefaultPosition, wx.DefaultSize, 0)
         self.check_compile.Bind(wx.EVT_CHECKBOX, self.onUIChange)
         # Add to horizontal sizer, aligned left
-        hSizer.Add(self.check_compile, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 5)
-
-        # Add expanding spacer between checkbox and combo box
-        hSizer.AddStretchSpacer()
+        gbs.Add(self.check_compile, pos=(1,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL, border=5)
 
         # Create a combobox for build options selection with read-only style
         self.build_options = wx.ComboBox(
@@ -149,9 +159,12 @@ class ArduinoUploadDialog(wx.Dialog):
         # Bind the selection change event
         self.build_options.Bind(wx.EVT_COMBOBOX, self.onBuildCacheOptionChange)
         # Add to horizontal sizer with right padding
-        hSizer.Add(self.build_options, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 45)
+        gbs.Add(self.build_options, pos=(1,1), flag=wx.ALL | wx.EXPAND, border=5)
 
-        bSizer21.Add(hSizer, 0, wx.EXPAND)
+        # Make the middle column growable
+        gbs.AddGrowableCol(1)
+
+        bSizer21.Add(gbs, 0, wx.EXPAND | wx.ALL, 5)
 
         self.m_staticline2 = wx.StaticLine(self.m_panel5, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
         bSizer21.Add(self.m_staticline2, 0, wx.EXPAND |wx.ALL, 5)
@@ -562,7 +575,7 @@ class ArduinoUploadDialog(wx.Dialog):
             self.baud_rate_combo.Enable(False)
             self.slaveid_txt.Enable(False)
             self.txpin_txt.Enable(False)
-        elif (self.check_modbus_serial.GetValue() == True):
+        else:
             self.serial_iface_combo.Enable(True)
             self.baud_rate_combo.Enable(True)
             self.slaveid_txt.Enable(True)
@@ -572,7 +585,7 @@ class ArduinoUploadDialog(wx.Dialog):
             self.com_port_combo.Enable(True)
             self.reload_button.Enable(True)
             self.upload_button.SetLabel(_('Transfer to PLC'))
-        elif (self.check_compile.GetValue() == True):
+        else:
             self.com_port_combo.Enable(False)
             self.reload_button.Enable(False)
             self.upload_button.SetLabel(_('Compile'))
@@ -586,7 +599,7 @@ class ArduinoUploadDialog(wx.Dialog):
             self.subnet_txt.Enable(False)
             self.wifi_ssid_txt.Enable(False)
             self.wifi_pwd_txt.Enable(False)
-        elif (self.check_modbus_tcp.GetValue() == True):
+        else:
             self.tcp_iface_combo.Enable(True)
             self.mac_txt.Enable(True)
             self.ip_txt.Enable(True)
@@ -730,10 +743,11 @@ class ArduinoUploadDialog(wx.Dialog):
 
     def setUIState(self, enabled):
         self.board_type_combo.Enable(enabled)
-        self.com_port_combo.Enable(enabled)
+        self.check_compile.Enable(enabled)
+        if (not enabled or self.check_compile.GetValue() == False):
+            self.com_port_combo.Enable(enabled)
         self.reload_button.Enable(enabled)
         self.upload_button.Enable(enabled)
-        self.check_compile.Enable(enabled)
         self.build_options.Enable(enabled)
 
     def OnUpload(self, event):
