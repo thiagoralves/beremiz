@@ -128,22 +128,30 @@ class ArduinoUploadDialog(wx.Dialog):
         # Create a horizontal sizer for the radio buttons
         hSizer = wx.BoxSizer(wx.HORIZONTAL)
 
-        # Create radio buttons
-        self.build_options = wx.RadioBox(
-            self.m_panel5, wx.ID_ANY, "", wx.DefaultPosition, wx.DefaultSize,
-            [option[0] for option in self.BUILD_OPTIONS],
-            4, wx.RA_SPECIFY_COLS | wx.NO_BORDER
-        )
+        # Create compile only checkbox
+        self.check_compile = wx.CheckBox(self.m_panel5, wx.ID_ANY, _('Compile Only'), wx.DefaultPosition, wx.DefaultSize, 0)
+        self.check_compile.Bind(wx.EVT_CHECKBOX, self.onUIChange)
+        # Add to horizontal sizer, aligned left
+        hSizer.Add(self.check_compile, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 5)
 
+        # Add expanding spacer between checkbox and combo box
+        hSizer.AddStretchSpacer()
+
+        # Create a combobox for build options selection with read-only style
+        self.build_options = wx.ComboBox(
+            self.m_panel5,
+            wx.ID_ANY,
+            choices=[option[0] for option in self.BUILD_OPTIONS],
+            style=wx.CB_DROPDOWN | wx.CB_READONLY
+        )
+        # Set default selection to first item
         self.build_options.SetSelection(0)
-        self.build_options.Bind(wx.EVT_RADIOBOX, self.onBuildCacheOptionChange)
-        hSizer.Add(self.build_options, 0, wx.LEFT | wx.ALIGN_CENTER_VERTICAL, 15)
+        # Bind the selection change event
+        self.build_options.Bind(wx.EVT_COMBOBOX, self.onBuildCacheOptionChange)
+        # Add to horizontal sizer with right padding
+        hSizer.Add(self.build_options, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 45)
 
         bSizer21.Add(hSizer, 0, wx.EXPAND)
-
-        self.check_compile = wx.CheckBox(self.m_panel5, wx.ID_ANY, _('Compile Only'), wx.DefaultPosition, wx.DefaultSize, 0)
-        bSizer21.Add(self.check_compile, 0, wx.LEFT, 15)
-        self.check_compile.Bind(wx.EVT_CHECKBOX, self.onUIChange)
 
         self.m_staticline2 = wx.StaticLine(self.m_panel5, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
         bSizer21.Add(self.m_staticline2, 0, wx.EXPAND |wx.ALL, 5)
@@ -180,7 +188,7 @@ class ArduinoUploadDialog(wx.Dialog):
         # set read-only
         self.output_text.SetReadOnly(True)
 
-        bSizer21.Add(self.output_text, 0, wx.ALL|wx.EXPAND, 5)
+        bSizer21.Add(self.output_text, wx.SizerFlags().Expand().Border(wx.ALL, 5).Border(wx.RIGHT, 10))
 
         # define the text communication queue
         self.text_queue = queue.Queue()
@@ -535,7 +543,15 @@ class ArduinoUploadDialog(wx.Dialog):
         self.settings.pop('user_aout', None);
         self.onUIChange(e)
 
+    # def onBuildCacheOptionChange(self, event):
+        # selected = self.build_options.GetSelection()
+        # self.active_build_option = self.BUILD_OPTIONS[selected][1]
+
     def onBuildCacheOptionChange(self, event):
+        """
+        Event handler for build cache option changes in the ComboBox.
+        Updates the active build option based on user selection.
+        """
         selected = self.build_options.GetSelection()
         self.active_build_option = self.BUILD_OPTIONS[selected][1]
 
@@ -633,7 +649,22 @@ class ArduinoUploadDialog(wx.Dialog):
         self.onUIChange(None)
         self.project_controller.SetArduinoSettingsChanged()
 
+    # def set_build_option(self, saved_option: builder.BuildCacheOption):
+        # self.active_build_option = saved_option
+        # for index, (_ignored, enum_value) in enumerate(self.BUILD_OPTIONS):
+            # if enum_value == saved_option:
+                # self.build_options.SetSelection(index)
+                # break
+
     def set_build_option(self, saved_option: builder.BuildCacheOption):
+        """
+        Sets the build option in the ComboBox based on saved settings.
+
+        Args:
+            saved_option (BuildCacheOption): The build option to be set
+
+        Updates both the ComboBox selection and the active build option.
+        """
         self.active_build_option = saved_option
         for index, (_ignored, enum_value) in enumerate(self.BUILD_OPTIONS):
             if enum_value == saved_option:
