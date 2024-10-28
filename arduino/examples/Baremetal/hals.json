@@ -42,7 +42,7 @@
     "last_update": 0,
     "platform": "arduino:mbed_giga:giga",
     "source": "giga.cpp",
-    "version": "4.1.1"
+    "version": "0"
   },
   "Arduino Leonardo": {
     "core": "arduino:avr",
@@ -294,7 +294,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:nano_nora",
     "source": "esp32.cpp",
-    "version": "3.0.5"
+    "version": "0"
   },
   "ESP32-C3": {
     "core": "esp32:esp32",
