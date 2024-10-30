@@ -85,22 +85,6 @@ class ArduinoUploadDialog(wx.Dialog):
         self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), board_type_comboChoices, 0)
         top_sizer.Add(self.board_type_combo, pos=(0,1), flag=wx.ALL | wx.EXPAND, border=0)
 
-        # # Placeholder for the first row, third column
-        # top_sizer.Add((0, 0), pos=(0,2), flag=wx.EXPAND, border=5)
-
-        # # COM Port
-        # self.m_staticText2 = wx.StaticText(top_panel, wx.ID_ANY, _('COM Port'), wx.DefaultPosition, wx.Size(label_width, -1), 0)
-        # self.m_staticText2.Wrap(-1)
-        # top_sizer.Add(self.m_staticText2, pos=(1,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
-
-        # self.com_port_combo = wx.ComboBox(top_panel, wx.ID_ANY, "COM1", wx.DefaultPosition, wx.Size(-1,-1), [""], 0)
-        # top_sizer.Add(self.com_port_combo, pos=(1,1), flag=wx.ALL | wx.EXPAND, border=5)
-
-        # button_size = self.com_port_combo.GetSize().GetHeight()
-        # self.reload_button = wx.Button(top_panel, wx.ID_ANY, "\u21BB", wx.DefaultPosition, size=(button_size, button_size), style=wx.BU_EXACTFIT)
-        # self.reload_button.SetToolTip(_('Reload COM port list'))
-        # top_sizer.Add(self.reload_button, pos=(1,2), flag=wx.ALL, border=5)
-
         self.m_staticline1 = wx.StaticLine(top_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
         top_sizer.Add(self.m_staticline1, pos=(1,0), span=(1,3), flag=wx.EXPAND, border=5)
 
@@ -824,17 +808,17 @@ class ArduinoUploadDialog(wx.Dialog):
             define_file += '#define USE_MQTT_BLOCKS\n'
         if (self.plc_program.find('ARDUINOCAN_CONF;') > 0):
             define_file += '#define USE_ARDUINOCAN_BLOCK\n'
-        if (self.plc_program.find('ARDUINOCAN_WRITE;') > 0):
+        elif (self.plc_program.find('ARDUINOCAN_WRITE;') > 0):
             define_file += '#define USE_ARDUINOCAN_BLOCK\n'
-        if (self.plc_program.find('ARDUINOCAN_WRITE_WORD;') > 0):
+        elif (self.plc_program.find('ARDUINOCAN_WRITE_WORD;') > 0):
             define_file += '#define USE_ARDUINOCAN_BLOCK\n'
-        if (self.plc_program.find('ARDUINOCAN_READ;') > 0):
+        elif (self.plc_program.find('ARDUINOCAN_READ;') > 0):
             define_file += '#define USE_ARDUINOCAN_BLOCK\n'
         if (self.plc_program.find('STM32CAN_CONF;') > 0):
             define_file += '#define USE_STM32CAN_BLOCK\n'
-        if (self.plc_program.find('STM32CAN_WRITE;') > 0):
+        elif (self.plc_program.find('STM32CAN_WRITE;') > 0):
             define_file += '#define USE_STM32CAN_BLOCK\n'
-        if (self.plc_program.find('STM32CAN_READ;') > 0):
+        elif (self.plc_program.find('STM32CAN_READ;') > 0):
             define_file += '#define USE_STM32CAN_BLOCK\n'
 
         #Generate Arduino Extension (sketch) define
