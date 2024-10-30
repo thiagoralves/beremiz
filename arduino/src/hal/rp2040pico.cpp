@@ -28,6 +28,11 @@ uint8_t pinMask_AOUT[] = {PINMASK_AOUT}; //2,3 can be used if SPI not required
 
 void hardwareInit()
 {
+    // set the analog input resolution to 12bit
+    analogReadResolution(12);
+    // set the analog output resolution to 16bit
+    analogWriteResolution(16);
+    
     for (int i = 0; i < NUM_DISCRETE_INPUT; i++)
     {
         pinMode(pinMask_DIN[i], INPUT);
