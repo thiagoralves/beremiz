@@ -380,9 +380,9 @@ void updateTime()
 
     time.sleep(2)  # make sure glueVars.c was written to disk
 
-    # Patch POUS.c to include POUS.h
+    # Patch POUS.c to include POUS.h and config0.h
     f = open(base_path+'POUS.c', 'r')
-    pous_c = '#include "POUS.h"\n\n' + f.read()
+    pous_c = '#include "POUS.h"\n#include "config0.h"\n\n' + f.read()
     f.close()
 
     f = open(base_path+'POUS.c', 'w')
