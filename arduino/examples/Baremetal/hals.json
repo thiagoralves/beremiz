@@ -603,6 +603,29 @@
     "source": "rp2040pico.cpp",
     "version": "0"
   },
+  "Raspberry Pico 2": {
+    "core": "rp2040:rp2040",
+    "default_ain": "26, 27, 28",
+    "default_aout": "4,5",
+    "default_din": "6, 7, 8, 9, 10, 11, 12, 13",
+    "default_dout": "14, 15, 16, 17, 18, 19, 20, 21",
+    "last_update": 0,
+    "platform": "rp2040:rp2040:rpipico2",
+    "source": "rp2040pico.cpp",
+    "version": "4.2.0"
+  },
+  "Raspberry Pico 2 (RISCV)": {
+    "arch": "riscv",
+    "core": "rp2040:rp2040",
+    "default_ain": "26, 27, 28",
+    "default_aout": "4,5",
+    "default_din": "6, 7, 8, 9, 10, 11, 12, 13",
+    "default_dout": "14, 15, 16, 17, 18, 19, 20, 21",
+    "last_update": 0,
+    "platform": "rp2040:rp2040:rpipico2:arch=riscv",
+    "source": "rp2040pico.cpp",
+    "version": "4.2.0"
+  },
   "SEQUENT-ESP32-PI": {
     "core": "esp32:esp32",
     "default_ain": "34, 35",
