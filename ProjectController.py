@@ -1378,9 +1378,22 @@ class ProjectController(ConfigTreeNode, PLCControler):
         extrafilespath = self._getExtraFilesPath()
         # Remove old directory
         if os.path.exists(extrafilespath):
-            shutil.rmtree(extrafilespath)
+            try:
+                shutil.rmtree(extrafilespath)
+            except OSError as e:
+                # Handle and log specific OS-related errors
+                self.logger.write_error(f"Failed to clean the project build folder: {e.filename}\n")
+                self.logger.write_error(f"{e.strerror} (Error Code: {e.errno})\n")
+                self.logger.write_error("Try to manually remove the build folder inside your project path if you have issues during compilation\n")
+            except Exception as e:
+                # Catch any other unexpected exceptions
+                self.logger.write_error(f"An unexpected error occurred while cleaning the build folder: {str(e)}\n")
+                self.logger.write_error("Try to manually remove the build folder inside your project path if you have issues during compilation\n")
         # Recreate directory
-        os.mkdir(extrafilespath)
+        try:
+            os.mkdir(extrafilespath)
+        except Exception as e:
+            self.logger.write_error(f"Failed to create extra files folder: {str(e)}\n")
         # Then write the files
         for fname, fobject in ExtraFiles:
             fpath = os.path.join(extrafilespath, fname)
