@@ -11,6 +11,9 @@ import sys
 import time
 import select
 import wx
+from typing import Tuple, Optional
+import re
+# from asciidoc.a2x import cli
 
 # List of OPLC dependencies
 # This list can be reduced, as soon as the HALs list provides board specific library dependencies.
@@ -44,11 +47,16 @@ compiler_logs = ''
 global base_path
 base_path = 'editor/arduino/src/'
 
+global cli_command
+cli_command = []
+
+
 class BuildCacheOption(Enum):
     USE_CACHE = 0
     CLEAN_BUILD = 1
-    CLEAN_LIB = 2
-    CLEAN_ALL = 3
+    UPGRADE_CORE = 2
+    UPGRADE_LIBS = 3
+    MR_PROPER = 4
 
     def __lt__(self, other):
         if self.__class__ is other.__class__:
@@ -234,6 +242,32 @@ def log_host_info(send_text):
     path_content = os.environ.get('PATH', '')
     append_compiler_log(send_text, "\n" + _("active PATH Variable") + ":\n" + path_content + "\n\n")
 
+def check_libraries_status() -> Tuple[int, str]:
+    """
+    Check the status of Arduino libraries.
+    
+    Returns:
+        Tuple[int, str]: (Status code, Description)
+        Status codes:
+        0 - Updates available
+        1 - All up to date
+        2 - Error checking libraries
+    """
+    try:
+        # Check for available updates
+        cmd = cli_command + ['lib', 'list', '--updatable']
+        updatable_list = runCommand(' '.join(cmd))
+        
+        if not updatable_list.strip():
+            return (1, "All libraries are up to date")
+            
+        # Count updatable libraries
+        lib_count = len([line for line in updatable_list.split('\n') if line.strip()])
+        return (0, f"Updates available for {lib_count} libraries")
+            
+    except Exception as e:
+        return (2, f"Error checking libraries: {str(e)}")
+
 def get_installed_libraries(cli_command_str) -> List[str]:
     #print("Executing command:", cli_command_str + " lib list --json")
     libraries_json = runCommand(cli_command_str + " lib list --json")
@@ -276,7 +310,208 @@ def clean_libraries(send_text, cli_command):
 
     return return_code
 
-def build(st_file, platform, source_file, port, send_text, hals, build_option):
+def upgrade_libraries() -> Tuple[bool, str]:
+    """
+    Performs upgrade of all outdated libraries.
+    
+    Returns:
+        Tuple[bool, str]: (Success, Description)
+    """
+    try:
+        # Update library index
+        cmd = cli_command + ['lib', 'update-index']
+        runCommand(' '.join(cmd))
+        
+        # Check for updates
+        status, message = check_libraries_status()
+        if status == 1:  # All up to date
+            return (True, message)
+        elif status == 2:  # Error
+            return (False, message)
+            
+        # Perform upgrade
+        cmd = cli_command + ['lib', 'upgrade']
+        result = runCommand(' '.join(cmd))
+        return (True, f"Libraries upgrade completed: {result}")
+            
+    except Exception as e:
+        return (False, f"Libraries upgrade failed: {str(e)}")
+
+def get_core_version(core_id: str) -> Optional[str]:
+    """
+    Get the installed version of a specific Arduino core.
+    
+    Args:
+        core_id: The ID of the core (e.g. 'esp32:esp32')
+        
+    Returns:
+        The installed version as string or None if core is not installed
+        
+    Example:
+        >>> get_core_version('esp32:esp32')
+        '2.0.11'
+    """
+    try:
+        # Run arduino-cli command and capture output
+        cmd = cli_command + ['--json', 'core', 'list']
+        result = runCommand(' '.join(cmd))
+        
+        # Parse JSON output
+        data = json.loads(result)
+        
+        # Search for the specified core
+        for platform in data.get('platforms', []):
+            if platform.get('id') == core_id:
+                return platform.get('installed_version')
+                
+        return None
+        
+    except json.JSONDecodeError as e:
+        print(f"Error parsing JSON output: {e}")
+        return None
+
+def check_core_status(core_name: str) -> Tuple[int, str]:
+    """
+    Check the status of an Arduino core.
+    
+    Args:
+        core_name: Name of the core (e.g. "esp32:esp32")
+        
+    Returns:
+        Tuple[int, str]: (Status code, Description)
+        Status codes:
+        0 - Upgrade sufficient or no action needed
+        1 - Reinstallation recommended
+        2 - First installation needed
+    """
+    # Check if core is installed
+    cmd = cli_command + ['core', 'list']
+    core_list = runCommand(' '.join(cmd))
+    if core_name not in core_list:
+        return (2, f"Core {core_name} is not installed")
+    
+    # Check for errors in installation
+    error_patterns = re.compile(r'error|corrupt|invalid|fail', re.IGNORECASE)
+    if error_patterns.search(core_list):
+        return (1, f"Errors found in core {core_name}")
+    
+    # Check for available updates
+    cmd = cli_command + ['core', 'list', '--updatable']
+    updatable_list = runCommand(' '.join(cmd))
+    if core_name not in updatable_list:
+        return (0, f"No updates available for {core_name}")
+    
+    # Test upgrade dry-run
+    cmd = cli_command + ['core', 'upgrade', core_name, '--dry-run']
+    upgrade_test = runCommand(' '.join(cmd))
+    if error_patterns.search(upgrade_test):
+        return (1, f"Upgrade conflicts found for {core_name}")
+    
+    return (0, f"Normal upgrade sufficient for {core_name}")
+
+def upgrade_core(core_name: str) -> Tuple[bool, str]:
+    """
+    Performs only upgrade of core without reinstallation.
+    
+    Args:
+        core_name: Name of the core (e.g. "esp32:esp32")
+        
+    Returns:
+        Tuple[bool, str]: (Success, Description)
+    """
+    try:
+        # Update index first
+        cmd = cli_command + ['core', 'update-index']
+        runCommand(' '.join(cmd))
+        
+        # Check if upgrade is available
+        cmd = cli_command + ['core', 'list', '--updatable']
+        updatable = runCommand(' '.join(cmd))
+        
+        if core_name not in updatable:
+            return (True, "No upgrade needed")
+            
+        # Perform upgrade
+        cmd = cli_command + ['core', 'upgrade', core_name]
+        result = runCommand(' '.join(cmd))
+        return (True, f"Core upgrade completed: {result}")
+            
+    except Exception as e:
+        return (False, f"Core upgrade failed: {str(e)}")
+
+def reinstall_core(core_name: str) -> Tuple[bool, str]:
+    """
+    Forces complete reinstallation of core.
+    
+    Args:
+        core_name: Name of the core (e.g. "esp32:esp32")
+        
+    Returns:
+        Tuple[bool, str]: (Success, Description)
+    """
+    try:
+        # Remove core if exists
+        cmd = cli_command + ['core', 'list']
+        installed = runCommand(' '.join(cmd))
+        
+        if core_name in installed:
+            cmd = cli_command + ['core', 'remove', core_name]
+            runCommand(' '.join(cmd))
+        
+        # Install core
+        cmd = cli_command + ['core', 'install', core_name]
+        result = runCommand(' '.join(cmd))
+        return (True, f"Core reinstallation completed: {result}")
+            
+    except Exception as e:
+        return (False, f"Core reinstallation failed: {str(e)}")
+
+def handle_core_update(core_name: str) -> Tuple[bool, str]:
+    """
+    Performs necessary update actions for a core.
+    
+    Args:
+        core_name: Name of the core (e.g. "esp32:esp32")
+        
+    Returns:
+        Tuple[bool, str]: (Success, Description)
+    """
+    try:
+        # Update index
+        cmd = cli_command + ['core', 'update-index']
+        result = runCommand(' '.join(cmd))
+        
+        # Check status
+        status, message = check_core_status(core_name)
+        
+        if status == 0:
+            # Double-check for updates
+            cmd = cli_command + ['core', 'list', '--updatable']
+            updatable = runCommand(' '.join(cmd))
+            if core_name in updatable:
+                cmd = cli_command + ['core', 'upgrade', core_name]
+                result = runCommand(' '.join(cmd))
+                return (True, f"Upgrade successful: {result}")
+            return (True, "No action needed")
+            
+        elif status == 1:
+            # Perform reinstallation
+            cmd = cli_command + ['core', 'remove', core_name]
+            runCommand(' '.join(cmd))
+            cmd = cli_command + ['core', 'install', core_name]
+            result = runCommand(' '.join(cmd))
+            return (True, f"Reinstallation successful: {result}")
+            
+        elif status == 2:
+            # Perform first installation
+            cmd = cli_command + ['core', 'install', core_name]
+            result = runCommand(' '.join(cmd))
+            return (True, f"First installation successful: {result}")
+            
+    except Exception as e:
+        return (False, f"Error with {core_name}: {str(e)}")
+
+def build(st_file, arduino_platform, source_file, port, send_text, board_hal, build_option):
     global base_path
     global compiler_logs
     compiler_logs = ''
@@ -286,12 +521,10 @@ def build(st_file, platform, source_file, port, send_text, hals, build_option):
 
     #Check if board is installed
     board_installed = False
-    core = ''
-    for board in hals:
-        if hals[board]['platform'] == platform:
-            core = hals[board]['core']
-            if hals[board]['version'] != "0":
-                board_installed = True
+    update_subsystem = True
+    core = board_hal['core']
+    if board_hal['version'] != "0":
+        board_installed = True
 
     #Check MatIEC compiler
     if (os.path.exists("editor/arduino/bin/iec2c") or os.path.exists("editor/arduino/bin/iec2c.exe") or os.path.exists("editor/arduino/bin/iec2c_mac")):
@@ -314,7 +547,6 @@ def build(st_file, platform, source_file, port, send_text, hals, build_option):
         append_compiler_log(send_text, _("Error: iec2c compiler not found!") + '\n')
         return
 
-    cli_command = []
     if os_platform.system() == 'Windows':
         cli_command = ['editor\\arduino\\bin\\arduino-cli-w64', '--no-color']
     elif os_platform.system() == 'Darwin':
@@ -323,14 +555,14 @@ def build(st_file, platform, source_file, port, send_text, hals, build_option):
         cli_command = ['editor/arduino/bin/arduino-cli-l64', '--no-color']
 
     #Install/Update board support
-    if not board_installed or build_option >= BuildCacheOption.CLEAN_ALL:
+    if not board_installed or build_option >= BuildCacheOption.MR_PROPER:
         append_compiler_log(send_text, _("Cleaning download cache") + "...\n")
         runCommandToWin(send_text, cli_command + ['cache', 'clean'])
 
         if board_installed == False:
-            append_compiler_log(send_text, _("Support for {platform} is not installed on OpenPLC Editor. Please be patient and wait while {platform} is being installed...").format(platform=platform) + '\n')
-        elif build_option >= BuildCacheOption.CLEAN_ALL:
-            append_compiler_log(send_text, _("Updating support for {platform}. Please be patient and wait while {platform} is being installed...").format(platform=platform) + '\n')
+            append_compiler_log(send_text, _("Support for {arduino_platform} is not installed on OpenPLC Editor. Please be patient and wait while {arduino_platform} is being installed...").format(arduino_platform=platform) + '\n')
+        elif build_option >= BuildCacheOption.MR_PROPER:
+            append_compiler_log(send_text, _("Updating support for {arduino_platform}. Please be patient and wait while {arduino_platform} is being installed...").format(arduino_platform=arduino_platform) + '\n')
 
         """
         ### ARDUINO-CLI CHEAT SHEET ###
@@ -352,26 +584,34 @@ def build(st_file, platform, source_file, port, send_text, hals, build_option):
         return_code = runCommandToWin(send_text, cli_command + ['config', 'init'])
 
         # Setup boards - remove 3rd party boards to re-add them later since we don't know if they're there or not
-        return_code = runCommandToWin(send_text, cli_command + ['config', 'remove', 'board_manager.additional_urls',
-            'https://arduino.esp8266.com/stable/package_esp8266com_index.json',
-            'https://espressif.github.io/arduino-esp32/package_esp32_index.json',
-            'https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json',
-            'https://raw.githubusercontent.com/CONTROLLINO-PLC/CONTROLLINO_Library/master/Boards/package_ControllinoHardware_index.json',
-            'https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json',
-            'https://facts-engineering.gitlab.io/facts-open-source/p1am/beta_file_hosting/package_productivity-P1AM_200-boardmanagermodule_index.json',
-            'https://raw.githubusercontent.com/VEA-SRL/IRUINO_Library/main/package_vea_index.json',
-            'https://raw.githubusercontent.com/facts-engineering/facts-engineering.github.io/master/package_productivity-P1AM-boardmanagermodule_index.json'])
+        # return_code = runCommandToWin(send_text, cli_command + ['config', 'remove', 'board_manager.additional_urls',
+        #     'https://arduino.esp8266.com/stable/package_esp8266com_index.json',
+        #     'https://espressif.github.io/arduino-esp32/package_esp32_index.json',
+        #     'https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json',
+        #     'https://raw.githubusercontent.com/CONTROLLINO-PLC/CONTROLLINO_Library/master/Boards/package_ControllinoHardware_index.json',
+        #     'https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json',
+        #     'https://facts-engineering.gitlab.io/facts-open-source/p1am/beta_file_hosting/package_productivity-P1AM_200-boardmanagermodule_index.json',
+        #     'https://raw.githubusercontent.com/VEA-SRL/IRUINO_Library/main/package_vea_index.json',
+        #     'https://raw.githubusercontent.com/facts-engineering/facts-engineering.github.io/master/package_productivity-P1AM-boardmanagermodule_index.json'])
 
         # Setup boards - add 3rd party boards
-        return_code = runCommandToWin(send_text, cli_command + ['config', 'add', 'board_manager.additional_urls',
-            'https://arduino.esp8266.com/stable/package_esp8266com_index.json',
-            'https://espressif.github.io/arduino-esp32/package_esp32_index.json',
-            'https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json',
-            'https://raw.githubusercontent.com/CONTROLLINO-PLC/CONTROLLINO_Library/master/Boards/package_ControllinoHardware_index.json',
-            'https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json',
-            'https://facts-engineering.gitlab.io/facts-open-source/p1am/beta_file_hosting/package_productivity-P1AM_200-boardmanagermodule_index.json',
-            'https://raw.githubusercontent.com/facts-engineering/facts-engineering.github.io/master/package_productivity-P1AM-boardmanagermodule_index.json',
-            'https://raw.githubusercontent.com/VEA-SRL/IRUINO_Library/main/package_vea_index.json'])
+        # return_code = runCommandToWin(send_text, cli_command + ['config', 'add', 'board_manager.additional_urls',
+        #     'https://arduino.esp8266.com/stable/package_esp8266com_index.json',
+        #     'https://espressif.github.io/arduino-esp32/package_esp32_index.json',
+        #     'https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json',
+        #     'https://raw.githubusercontent.com/CONTROLLINO-PLC/CONTROLLINO_Library/master/Boards/package_ControllinoHardware_index.json',
+        #     'https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json',
+        #     'https://facts-engineering.gitlab.io/facts-open-source/p1am/beta_file_hosting/package_productivity-P1AM_200-boardmanagermodule_index.json',
+        #     'https://raw.githubusercontent.com/facts-engineering/facts-engineering.github.io/master/package_productivity-P1AM-boardmanagermodule_index.json',
+        #     'https://raw.githubusercontent.com/VEA-SRL/IRUINO_Library/main/package_vea_index.json'])
+        
+        # Setup boards - remove 3rd party boards to re-add them later since we don't know if they're there or not
+        board_manager_url = board_hal.get('board_manager_url', None)
+        if board_manager_url is not None:
+            return_code = runCommandToWin(send_text, cli_command + ['config', 'remove', 'board_manager.additional_urls',
+                        board_manager_url])
+            return_code = runCommandToWin(send_text, cli_command + ['config', 'add', 'board_manager.additional_urls',
+                        board_manager_url])
 
         if (return_code != 0):
             append_compiler_log(send_text, '\n' + _('BOARD INSTALLATION FAILED!') + '\n')
@@ -382,19 +622,36 @@ def build(st_file, platform, source_file, port, send_text, hals, build_option):
         if (return_code != 0):
             append_compiler_log(send_text, '\n' + _('INDEX UPDATE FAILED!') + '\n')
             return
-
-        return_code = runCommandToWin(send_text, cli_command + ['update'])
-        if (return_code != 0):
-            append_compiler_log(send_text, '\n' + _('CORE or LIBRARIES UPDATE FAILED!') + '\n')
-            return
-
+        
         # Install board
         return_code = runCommandToWin(send_text, cli_command + ['core', 'install', core])
         if (return_code != 0):
             append_compiler_log(send_text, '\n' + _('CORE INSTALLATION FAILED!') + '\n')
             return
+        
+        update_subsystem = True
 
-    if build_option >= BuildCacheOption.CLEAN_LIB:
+    # Check if should update subsystem
+    if ('last_update' in board_hal):
+        last_update = board_hal['last_update']
+        if (time.time() - float(last_update) > 604800.0): #604800 is the number of seconds in a week (7 days)
+            update_subsystem = True
+        else:
+            update_subsystem = False
+    else:
+        update_subsystem = True
+
+    if update_subsystem:
+        return_code = runCommandToWin(send_text, cli_command + ['update'])
+        if (return_code != 0):
+            append_compiler_log(send_text, '\n' + _('CORE or LIBRARIES UPDATE FAILED!') + '\n')
+            return
+
+        # update timestamp
+        board_hal['last_update'] = time.time()
+        board_hal['version'] = get_core_version(core)
+
+    if build_option >= BuildCacheOption.UPGRADE_LIBS:
         # Install all libs - required after core install/update and for clean libraries
         return_code = clean_libraries(send_text, cli_command)
 
@@ -648,7 +905,7 @@ void updateTime()
 
     build_command.extend(['--libraries=editor/arduino', '--build-property', 'compiler.c.extra_flags=-Ieditor/arduino/src/lib' + extraflags])
     build_command.extend(['--build-property', 'compiler.cpp.extra_flags=-Ieditor/arduino/src/lib' + extraflags])
-    build_command.extend(['--export-binaries', '-b', platform, 'editor/arduino/examples/Baremetal/Baremetal.ino'])
+    build_command.extend(['--export-binaries', '-b', arduino_platform, 'editor/arduino/examples/Baremetal/Baremetal.ino'])
 
     return_code = runCommandToWin(send_text, build_command)
 
@@ -660,7 +917,7 @@ void updateTime()
             append_compiler_log(send_text, '\n' + _('Uploading program to Arduino board at {port}...').format(port=port) + '\n')
 
             return_code = runCommandToWin(send_text, cli_command + ['upload', '--port',
-                                            port, '--fqbn', platform, 'editor/arduino/examples/Baremetal/'])
+                                            port, '--fqbn', arduino_platform, 'editor/arduino/examples/Baremetal/'])
 
             append_compiler_log(send_text, '\n' + _('Done!') + '\n')
         else:

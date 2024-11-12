@@ -8,7 +8,7 @@
     "last_update": 0,
     "platform": "arduino:sam:arduino_due_x",
     "source": "mega_due.cpp",
-    "version": "1.6.12"
+    "version": "0"
   },
   "Arduino Due (programming port)": {
     "core": "arduino:sam",
@@ -19,7 +19,7 @@
     "last_update": 0,
     "platform": "arduino:sam:arduino_due_x_dbg",
     "source": "mega_due.cpp",
-    "version": "1.6.12"
+    "version": "0"
   },
   "Arduino Edge Control": {
     "core": "arduino:mbed_edge",
@@ -30,7 +30,7 @@
     "last_update": 0,
     "platform": "arduino:mbed_edge:edge_control",
     "source": "edge_control.cpp",
-    "version": "4.1.5"
+    "version": "0"
   },
   "Arduino Giga": {
     "core": "arduino:mbed_giga",
@@ -52,7 +52,7 @@
     "last_update": 0,
     "platform": "arduino:avr:leonardo",
     "source": "uno_leonardo_nano_micro_zero.cpp",
-    "version": "1.8.6"
+    "version": "0"
   },
   "Arduino Mega": {
     "core": "arduino:avr",
@@ -63,7 +63,7 @@
     "last_update": 0,
     "platform": "arduino:avr:mega",
     "source": "mega_due.cpp",
-    "version": "1.8.6"
+    "version": "0"
   },
   "Arduino Micro": {
     "core": "arduino:avr",
@@ -74,7 +74,7 @@
     "last_update": 0,
     "platform": "arduino:avr:micro",
     "source": "uno_leonardo_nano_micro_zero.cpp",
-    "version": "1.8.6"
+    "version": "0"
   },
   "Arduino Nano": {
     "core": "arduino:avr",
@@ -85,7 +85,7 @@
     "last_update": 0,
     "platform": "arduino:avr:nano",
     "source": "uno_leonardo_nano_micro_zero.cpp",
-    "version": "1.8.6"
+    "version": "0"
   },
   "Arduino Opta": {
     "core": "arduino:mbed_opta",
@@ -108,7 +108,7 @@
     "last_update": 0,
     "platform": "arduino:avr:uno",
     "source": "uno_leonardo_nano_micro_zero.cpp",
-    "version": "1.8.6"
+    "version": "0"
   },
   "Arduino Zero (native USB port)": {
     "core": "arduino:samd",
@@ -119,7 +119,7 @@
     "last_update": 0,
     "platform": "arduino:samd:arduino_zero_native",
     "source": "uno_leonardo_nano_micro_zero.cpp",
-    "version": "1.8.14"
+    "version": "0"
   },
   "Arduino Zero (programming port)": {
     "core": "arduino:samd",
@@ -130,7 +130,7 @@
     "last_update": 0,
     "platform": "arduino:samd:arduino_zero_edbg",
     "source": "uno_leonardo_nano_micro_zero.cpp",
-    "version": "1.8.14"
+    "version": "0"
   },
   "Blackpill STM32-F411CE (DFU STM32 Bootloader)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -143,7 +143,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF4:pnum=BLACKPILL_F411CE,upload_method=dfuMethod,usb=CDCgen",
     "source": "stm32_f411ce.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "Blackpill STM32-F411CE (HID Bootloader 2.2)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -156,7 +156,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF4:pnum=BLACKPILL_F411CE,upload_method=hidMethod,usb=CDCgen",
     "source": "stm32_f411ce.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "Blackpill STM32-F411CE (SWD Programmer)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -169,7 +169,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF4:pnum=BLACKPILL_F411CE,upload_method=swdMethod,usb=CDCgen",
     "source": "stm32_f411ce.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "Blackpill STM32-F411CE (Serial Programmer)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -182,7 +182,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF4:pnum=BLACKPILL_F411CE,upload_method=serialMethod,usb=CDCgen",
     "source": "stm32_f411ce.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "Bluepill STM32-F103CB (DFU STM32 Bootloader)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -195,7 +195,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF1:pnum=BLUEPILL_F103C8,upload_method=dfuMethod,usb=CDCgen",
     "source": "stm32_f103cb.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "Bluepill STM32-F103CB (HID Bootloader 2.2)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -208,7 +208,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF1:pnum=BLUEPILL_F103C8,upload_method=hidMethod,usb=CDCgen",
     "source": "stm32_f103cb.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "Bluepill STM32-F103CB (SWD Programmer)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -221,7 +221,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF1:pnum=BLUEPILL_F103C8,upload_method=swdMethod,usb=CDCgen",
     "source": "stm32_f103cb.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "Bluepill STM32-F103CB (Serial Programmer)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -234,7 +234,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF1:pnum=BLUEPILL_F103C8,upload_method=serialMethod,usb=CDCgen",
     "source": "stm32_f103cb.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "CONTROLLINO MAXI": {
     "board_manager_url": "https://raw.githubusercontent.com/CONTROLLINO-PLC/CONTROLLINO_Library/master/Boards/package_ControllinoHardware_index.json",
@@ -246,7 +246,7 @@
     "last_update": 0,
     "platform": "CONTROLLINO_Boards:avr:controllino_maxi",
     "source": "controllino_maxi.cpp",
-    "version": "3.1.3"
+    "version": "0"
   },
   "CONTROLLINO MAXI Automation": {
     "board_manager_url": "https://raw.githubusercontent.com/CONTROLLINO-PLC/CONTROLLINO_Library/master/Boards/package_ControllinoHardware_index.json",
@@ -258,7 +258,7 @@
     "last_update": 0,
     "platform": "CONTROLLINO_Boards:avr:controllino_maxi_automation",
     "source": "controllino_maxi_automation.cpp",
-    "version": "3.1.3"
+    "version": "0"
   },
   "CONTROLLINO MEGA": {
     "board_manager_url": "https://raw.githubusercontent.com/CONTROLLINO-PLC/CONTROLLINO_Library/master/Boards/package_ControllinoHardware_index.json",
@@ -270,7 +270,7 @@
     "last_update": 0,
     "platform": "CONTROLLINO_Boards:avr:controllino_mega",
     "source": "controllino_mega.cpp",
-    "version": "3.1.3"
+    "version": "0"
   },
   "CONTROLLINO MINI": {
     "board_manager_url": "https://raw.githubusercontent.com/CONTROLLINO-PLC/CONTROLLINO_Library/master/Boards/package_ControllinoHardware_index.json",
@@ -282,7 +282,7 @@
     "last_update": 0,
     "platform": "CONTROLLINO_Boards:avr:controllino_mini",
     "source": "controllino_mini.cpp",
-    "version": "3.1.3"
+    "version": "0"
   },
   "ESP32 Generic": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
@@ -295,7 +295,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32:UploadSpeed=230400",
     "source": "esp32.cpp",
-    "version": "3.0.7"
+    "version": "0"
   },
   "ESP32 WROOM": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
@@ -308,7 +308,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32:UploadSpeed=230400",
     "source": "esp32.cpp",
-    "version": "3.0.7"
+    "version": "0"
   },
   "ESP32 WROVER": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
@@ -321,7 +321,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32wrover:UploadSpeed=230400,PartitionScheme=huge_app,FlashMode=qio,FlashFreq=40,PSRAM=enabled",
     "source": "esp32.cpp",
-    "version": "3.0.7"
+    "version": "0"
   },
   "ESP32-C3": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
@@ -334,7 +334,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32c3",
     "source": "esp32.cpp",
-    "version": "3.0.7"
+    "version": "0"
   },
   "ESP32-DOIT DEVKIT V1": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
@@ -347,7 +347,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32doit-devkit-v1",
     "source": "esp32.cpp",
-    "version": "3.0.7"
+    "version": "0"
   },
   "ESP32-S2": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
@@ -360,7 +360,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32s2",
     "source": "esp32.cpp",
-    "version": "3.0.7"
+    "version": "0"
   },
   "ESP32-S3": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
@@ -373,7 +373,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32s3",
     "source": "esp32.cpp",
-    "version": "3.0.7"
+    "version": "0"
   },
   "ESP8266 D1-mini": {
     "board_manager_url": "https://arduino.esp8266.com/stable/package_esp8266com_index.json",
@@ -386,7 +386,7 @@
     "last_update": 0,
     "platform": "esp8266:esp8266:d1_mini",
     "source": "esp8266.cpp",
-    "version": "3.1.2"
+    "version": "0"
   },
   "ESP8266 NodeMCU": {
     "board_manager_url": "https://arduino.esp8266.com/stable/package_esp8266com_index.json",
@@ -399,7 +399,7 @@
     "last_update": 0,
     "platform": "esp8266:esp8266:nodemcuv2",
     "source": "esp8266.cpp",
-    "version": "3.1.2"
+    "version": "0"
   },
   "FX3U-14M / LE3U-14M": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -411,7 +411,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF1:pnum=GENERIC_F103VCTX,upload_method=serialMethod",
     "source": "fx3u-14.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "FX3U-14M / WS3U-14Mx": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -423,7 +423,7 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:GenF1:pnum=GENERIC_F103VETX,upload_method=serialMethod",
     "source": "fx3u-14-WS3U.cpp",
-    "version": "2.8.1"
+    "version": "0"
   },
   "FX3U-24MR / DollaTek": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -439,7 +439,7 @@
     "user_aout": "PA4, PA5",
     "user_din": "PB13, PB14, PB11, PB12, PE15, PB10, PE13, PE14, PE11, PE12, PE9, PE10, PE7, PE8",
     "user_dout": "PC9, PC8, PA8, PA0, PB3, PD12, PB15, PA7, PA6, PA2",
-    "version": "2.8.1"
+    "version": "0"
   },
   "Iruino VEA": {
     "board_manager_url": "https://raw.githubusercontent.com/VEA-SRL/IRUINO_Library/main/package_vea_index.json",
@@ -452,7 +452,7 @@
     "last_update": 0,
     "platform": "iruino:esp32:iruino",
     "source": "iruinoVEA.cpp",
-    "version": "1.2"
+    "version": "0"
   },
   "Mkr WiFi": {
     "core": "arduino:samd",
@@ -464,7 +464,7 @@
     "last_update": 0,
     "platform": "arduino:samd:mkrwifi1010",
     "source": "mkr.cpp",
-    "version": "1.8.14"
+    "version": "0"
   },
   "Mkr Zero": {
     "core": "arduino:samd",
@@ -475,7 +475,7 @@
     "last_update": 0,
     "platform": "arduino:samd:mkrzero",
     "source": "mkr.cpp",
-    "version": "1.8.14"
+    "version": "0"
   },
   "Nano 33 BLE": {
     "core": "arduino:mbed_nano",
@@ -498,7 +498,7 @@
     "last_update": 0,
     "platform": "arduino:samd:nano_33_iot",
     "source": "nano_every.cpp",
-    "version": "1.8.14"
+    "version": "0"
   },
   "Nano Every": {
     "core": "arduino:megaavr",
@@ -532,7 +532,7 @@
     "last_update": 0,
     "platform": "arduino:samd:mkrzero",
     "source": "p1am.cpp",
-    "version": "1.8.14"
+    "version": "0"
   },
   "P1AM-200": {
     "board_manager_url": "https://raw.githubusercontent.com/facts-engineering/facts-engineering.github.io/master/package_productivity-P1AM-boardmanagermodule_index.json",
@@ -544,7 +544,7 @@
     "last_update": 0,
     "platform": "FACTS:samd:P1AM-200",
     "source": "p1am.cpp",
-    "version": "1.7.13"
+    "version": "0"
   },
   "Portenta Machine Control H7": {
     "core": "arduino:mbed_portenta",
@@ -569,7 +569,7 @@
     "last_update": 0,
     "platform": "rp2040:rp2040:jaguar",
     "source": "jaguar.cpp",
-    "version": "4.2.0"
+    "version": "0"
   },
   "Raspberry Pico": {
     "board_manager_url": "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json",
@@ -581,7 +581,7 @@
     "last_update": 0,
     "platform": "rp2040:rp2040:rpipico",
     "source": "rp2040pico.cpp",
-    "version": "4.2.0"
+    "version": "0"
   },
   "Raspberry Pico W": {
     "board_manager_url": "https://github.com/earlephilhower/arduino-pico/releases/download/global/package_rp2040_index.json",
@@ -594,7 +594,7 @@
     "last_update": 0,
     "platform": "rp2040:rp2040:rpipicow",
     "source": "rp2040pico.cpp",
-    "version": "4.2.0"
+    "version": "0"
   },
   "SEQUENT-ESP32-PI": {
     "board_manager_url": "https://espressif.github.io/arduino-esp32/package_esp32_index.json",
@@ -607,7 +607,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32doit-devkit-v1",
     "source": "sequent_esp32.cpp",
-    "version": "3.0.7"
+    "version": "0"
   },
   "STM32-F446ZET (NUCLEO)": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
@@ -620,6 +620,6 @@
     "last_update": 0,
     "platform": "STMicroelectronics:stm32:Nucleo_144:pnum=NUCLEO_F446ZE",
     "source": "stm32_f446zet_nucleo.cpp",
-    "version": "2.8.1"
+    "version": "0"
   }
 }

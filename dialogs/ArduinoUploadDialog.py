@@ -26,8 +26,9 @@ class ArduinoUploadDialog(wx.Dialog):
     BUILD_OPTIONS = [
             (_("Use build cache"), builder.BuildCacheOption.USE_CACHE),
             (_("Clean build cache"), builder.BuildCacheOption.CLEAN_BUILD),
-            (_("Clean build cache, reinstall libaries"), builder.BuildCacheOption.CLEAN_LIB),
-            (_("Mr. Proper (Clean, reinstall boards and libraries)"), builder.BuildCacheOption.CLEAN_ALL)
+            (_("Clean build cache, upgrade core"), builder.BuildCacheOption.UPGRADE_CORE),
+            (_("Clean build cache, upgrade libraries"), builder.BuildCacheOption.UPGRADE_LIBS),
+            (_("Mr. Proper (Clean, reinstall core, board and libraries)"), builder.BuildCacheOption.MR_PROPER)
         ]
 
 
@@ -40,8 +41,6 @@ class ArduinoUploadDialog(wx.Dialog):
         self.plc_program = st_code
         self.arduino_sketch = arduino_ext
         self.md5 = md5
-        self.last_update = 0
-        self.update_subsystem = True
         self.settings = {}
         current_dir = paths.AbsDir(__file__)
         self.com_port_combo_choices = {}
@@ -540,10 +539,6 @@ class ArduinoUploadDialog(wx.Dialog):
         self.settings.pop('user_aout', None);
         self.onUIChange(e)
 
-    # def onBuildCacheOptionChange(self, event):
-        # selected = self.build_options.GetSelection()
-        # self.active_build_option = self.BUILD_OPTIONS[selected][1]
-
     def onBuildCacheOptionChange(self, event):
         """
         Event handler for build cache option changes in the ComboBox.
@@ -646,13 +641,6 @@ class ArduinoUploadDialog(wx.Dialog):
         self.onUIChange(None)
         self.project_controller.SetArduinoSettingsChanged()
 
-    # def set_build_option(self, saved_option: builder.BuildCacheOption):
-        # self.active_build_option = saved_option
-        # for index, (_ignored, enum_value) in enumerate(self.BUILD_OPTIONS):
-            # if enum_value == saved_option:
-                # self.build_options.SetSelection(index)
-                # break
-
     def set_build_option(self, saved_option: builder.BuildCacheOption):
         """
         Sets the build option in the ComboBox based on saved settings.
@@ -674,9 +662,15 @@ class ArduinoUploadDialog(wx.Dialog):
     def startBuilder(self):
         # Get platform and source_file from hals
         board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
-        platform = self.hals[board_type]['platform']
+        arduino_platform = self.hals[board_type]['platform']
         source = self.hals[board_type]['source']
+        board_hal = self.hals[board_type]
 
+        old_values = {
+                'last_update': board_hal.get('last_update', None),  # get() if key does not exist
+                'version': board_hal.get('version', None)
+            }
+        
         self.generateDefinitionsFile()
 
         port = "None" #invalid port
@@ -694,9 +688,6 @@ class ArduinoUploadDialog(wx.Dialog):
             if not port_found:
                 port = selected_port  # Use the user entered value directly
 
-        if self.update_subsystem:
-            self.active_build_option = builder.BuildCacheOption.CLEAN_ALL
-
         # create a closure to encapsulate self, later this sends the text on behalf of the thread
         def send_text(output):
             self.send_output_text(output)
@@ -711,12 +702,18 @@ class ArduinoUploadDialog(wx.Dialog):
         wx.YieldIfNeeded()
 
         # now create the build thread
-        compiler_thread = threading.Thread(target=builder.build, args=(self.plc_program, platform, source, port, send_text, self.hals, self.active_build_option))
+        compiler_thread = threading.Thread(target=builder.build, args=(self.plc_program, arduino_platform, source, port, send_text, board_hal, self.active_build_option))
         compiler_thread.start()
         compiler_thread.join()
-        if (self.update_subsystem):
-            self.update_subsystem = False
-            self.last_update = time.time()
+        
+        values_changed = (
+            old_values['last_update'] != board_hal.get('last_update', None) or 
+            old_values['version'] != board_hal.get('version', None)
+        )
+        
+        if values_changed:
+            self.saveHals()
+
         self.saveSettings()
         self.updateInstalledBoards()
         self.loadSettings() # Get the correct board name if an update or install occurred
@@ -860,7 +857,9 @@ class ArduinoUploadDialog(wx.Dialog):
         self.settings['subnet'] = self.subnet_txt.GetValue()
         self.settings['ssid'] = self.wifi_ssid_txt.GetValue()
         self.settings['pwd'] = self.wifi_pwd_txt.GetValue()
-        self.settings['last_update'] = self.last_update
+
+        # Remove last_update from settings since it is now managed in hals.json
+        self.settings.pop('last_update', None)
 
         self.project_controller.SetArduinoSettingsChanged()
 
@@ -871,17 +870,17 @@ class ArduinoUploadDialog(wx.Dialog):
             self.restoreIODefaults(None)
             self.restoreCommDefaults(None)
 
-        # Check if should update subsystem
-        if ('last_update' in self.settings.keys()):
-            self.last_update = self.settings['last_update']
-            if (time.time() - float(self.last_update) > 604800.0): #604800 is the number of seconds in a week (7 days)
-                self.update_subsystem = True
-                self.last_update = time.time()
-            else:
-                self.update_subsystem = False
-        else:
-            self.update_subsystem = True
-            self.last_update = time.time()
+        # # Check if should update subsystem
+        # if ('last_update' in self.settings.keys()):
+        #     self.last_update = self.settings['last_update']
+        #     if (time.time() - float(self.last_update) > 604800.0): #604800 is the number of seconds in a week (7 days)
+        #         self.update_subsystem = True
+        #         self.last_update = time.time()
+        #     else:
+        #         self.update_subsystem = False
+        # else:
+        #     self.update_subsystem = True
+        #     self.last_update = time.time()
 
         # Get the correct name for the board_type
         board = self.settings['board_type'].split(' [')[0]
@@ -970,69 +969,65 @@ class ArduinoUploadDialog(wx.Dialog):
             print("Default settings file not found:", default_settings_file)
 
     def loadHals(self):
-        # load hals list from json file, or construct it
+        """Load HALs list from json file"""
         if platform.system() == 'Windows':
             jfile = 'editor\\arduino\\examples\\Baremetal\\hals.json'
         else:
             jfile = 'editor/arduino/examples/Baremetal/hals.json'
+    
+        with open(jfile, 'r') as f:
+            self.hals = json.load(f)
 
-        f = open(jfile, 'r')
-        self.hals = json.load(f)
-        f.close()
 
     def saveHals(self):
+        """Save HALs list to json file"""
         if platform.system() == 'Windows':
             jfile = 'editor\\arduino\\examples\\Baremetal\\hals.json'
         else:
             jfile = 'editor/arduino/examples/Baremetal/hals.json'
-        f = open(jfile, 'w')
-        json.dump(self.hals, f, indent=2, sort_keys=True)
-        f.flush()
-        f.close()
+        
+        with open(jfile, 'w') as f:
+            json.dump(self.hals, f, indent=2, sort_keys=True)
+            f.flush()
 
     def updateInstalledBoards(self):
+        """Update the list of installed boards using arduino-cli's JSON output"""
         if platform.system() == 'Windows':
             cli_command = 'editor\\arduino\\bin\\arduino-cli-w64'
         elif platform.system() == 'Darwin':
             cli_command = 'editor/arduino/bin/arduino-cli-mac'
         else:
             cli_command = 'editor/arduino/bin/arduino-cli-l64'
-
-        core_list = builder.runCommand(cli_command + ' --no-color core list')
-
+    
+        # Get core list in JSON format
+        core_list = builder.runCommand(cli_command + ' --json core list')
+    
         if core_list == None or core_list == '':
             print("Error reading core list")
             return
-
-        # Build list of all installed cores
-        lines = core_list.splitlines()
-        if (len(lines) < 2):
-            print("Error building list of installed platforms")
-            return
-
-        core_list = []
-        versions_list = []
-        for line in lines:
-            # Remove white spaces
-            line = line.split(' ')
-            while ('' in line):
-                line.remove('')
-            if (len(line) < 2):
-                print("Error removing whitespace from string")
-                continue
-            core = line[0]
-            version = line[1]
-            core_list.append(core)
-            versions_list.append((core, version))
-
-        # Update installed boards in list
-        for board in self.hals:
-            if self.hals[board]['core'] not in core_list:
-                self.hals[board]['version'] = '0'
-            else:
-                for version in versions_list:
-                    if self.hals[board]['core'] == version[0]:
-                        self.hals[board]['version'] = version[1]
+    
+        try:
+            # Parse JSON output
+            core_data = json.loads(core_list)
+            
+            # Update installed boards in list
+            for board in self.hals:
+                board_core = self.hals[board]['core']
+                version = '0'  # Default to not installed
+                
+                # Look for matching platform in JSON data
+                for arduino_platform in core_data['platforms']:
+                    if arduino_platform['id'] == board_core:
+                        version = arduino_platform['installed_version']
                         break
+                        
+                self.hals[board]['version'] = version
+    
+            self.saveHals()
+    
+        except json.JSONDecodeError:
+            print("Error parsing JSON output from arduino-cli")
+        except KeyError as e:
+            print(f"Unexpected JSON structure: {e}")
 
-        self.saveHals()
+
