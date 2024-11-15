@@ -28,6 +28,7 @@ class ArduinoUploadDialog(wx.Dialog):
             (_("Clean build cache"), builder.BuildCacheOption.CLEAN_BUILD),
             (_("Clean build cache, upgrade core"), builder.BuildCacheOption.UPGRADE_CORE),
             (_("Clean build cache, upgrade libraries"), builder.BuildCacheOption.UPGRADE_LIBS),
+            (_("Clean build cache, reinstall libraries"), builder.BuildCacheOption.CLEAN_LIBS),
             (_("Mr. Proper (Clean, reinstall core, board and libraries)"), builder.BuildCacheOption.MR_PROPER)
         ]
 
@@ -662,8 +663,6 @@ class ArduinoUploadDialog(wx.Dialog):
     def startBuilder(self):
         # Get platform and source_file from hals
         board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
-        arduino_platform = self.hals[board_type]['platform']
-        source = self.hals[board_type]['source']
         board_hal = self.hals[board_type]
 
         old_values = {
@@ -702,7 +701,7 @@ class ArduinoUploadDialog(wx.Dialog):
         wx.YieldIfNeeded()
 
         # now create the build thread
-        compiler_thread = threading.Thread(target=builder.build, args=(self.plc_program, arduino_platform, source, port, send_text, board_hal, self.active_build_option))
+        compiler_thread = threading.Thread(target=builder.build, args=(self.plc_program, port, send_text, board_hal, self.active_build_option))
         compiler_thread.start()
         compiler_thread.join()
         
@@ -1029,5 +1028,16 @@ class ArduinoUploadDialog(wx.Dialog):
             print("Error parsing JSON output from arduino-cli")
         except KeyError as e:
             print(f"Unexpected JSON structure: {e}")
+
+    # # Check if should update subsystem
+    # if ('last_update' in board_hal):
+    #     last_update = board_hal['last_update']
+    #     if (time.time() - float(last_update) > 604800.0): #604800 is the number of seconds in a week (7 days)
+    #         update_subsystem = True
+    #     else:
+    #         update_subsystem = False
+    #
+    # board_hal['last_update'] = time.time()
+    # board_hal['version'] = get_core_version(core)
 
 
