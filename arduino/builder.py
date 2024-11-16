@@ -103,16 +103,36 @@ def append_compiler_log(send_text, output):
     send_text(output)
 
 def runCommand(command):
+    """
+    Executes a command and returns its output.
+    
+    Args:
+        command: Command to execute, either as a list of arguments or as a string.
+                List format is preferred for safe handling of paths containing spaces.
+                Example list: ['path/to/program', '--arg1', 'value1', '--arg2']
+                
+    Returns:
+        str: Command output as UTF-8 string
+        
+    Raises:
+        subprocess.CalledProcessError: If command execution fails
+    """
     cmd_response = None
-
+    
     try:
-        cmd_response = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+        if isinstance(command, str):
+            # Legacy support for string commands (deprecated)
+            cmd_response = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+        else:
+            # List commands executed without shell - safe for paths with spaces
+            cmd_response = subprocess.check_output(command, shell=False, stderr=subprocess.STDOUT)
+            
     except subprocess.CalledProcessError as exc:
         cmd_response = exc.output
-
-    if cmd_response == None:
+        
+    if cmd_response is None:
         return ''
-
+        
     return cmd_response.decode('utf-8', errors='backslashreplace')
 
 def read_output(process, send_text, timeout=None):
@@ -249,7 +269,7 @@ def are_libraries_installed(lib_list: List[str]) -> List[str]:
     try:
         # Get list of installed libraries in JSON format
         cmd = cli_command + ['--json', 'lib', 'list']
-        result = runCommand(' '.join(cmd))
+        result = runCommand(cmd)
         
         if not result:
             return lib_list
@@ -285,11 +305,9 @@ def check_libraries_status() -> Tuple[int, str]:
         2 - Error checking libraries
     """
     try:
-        import json
-        
         # Check for available updates using JSON format
-        cmd = cli_command + ['--json', '--no-color', 'lib', 'list', '--updatable']
-        json_output = runCommand(' '.join(cmd)).strip()
+        cmd = cli_command + ['--json', 'lib', 'list', '--updatable']
+        json_output = runCommand(cmd)
         
         # Parse JSON output
         lib_data = json.loads(json_output)
@@ -312,26 +330,19 @@ def check_libraries_status() -> Tuple[int, str]:
     
 def get_installed_libraries(cli_command_str) -> List[str]:
     #print("Executing command:", cli_command_str + " lib list --json")
-    libraries_json = runCommand(cli_command_str + " lib list --json")
+    cmd = cli_command + ['--json', 'lib', 'list']
+    libraries_json = runCommand(cmd)
 
-    try:
-        libraries_data = json.loads(libraries_json)
-        installed_libs = []
+    libraries_data = json.loads(libraries_json)
+    installed_libs = []
 
-        for lib in libraries_data.get("installed_libraries", []):
-            lib_name = lib.get("library", {}).get("name")
-            if lib_name:
-                installed_libs.append(lib_name)
+    for lib in libraries_data.get("installed_libraries", []):
+        lib_name = lib.get("library", {}).get("name")
+        if lib_name:
+            installed_libs.append(lib_name)
 
-        #print("Installed libraries:", installed_libs)
-        return installed_libs
-    except json.JSONDecodeError as e:
-        print("Error decoding JSON:", e)
-        print("Raw JSON output:", libraries_json)
-        return []
-    except Exception as e:
-        print("An error occurred:", e)
-        return []
+    #print("Installed libraries:", installed_libs)
+    return installed_libs
 
 def clean_libraries(send_text, cli_command):
     # the intended behavior is to keep the list of installed libraries identical, but remove all and re-install all of them
@@ -420,7 +431,7 @@ def get_core_version(core_id: str) -> Optional[str]:
     try:
         # Run arduino-cli command and capture output
         cmd = cli_command + ['--json', 'core', 'list']
-        result = runCommand(' '.join(cmd))
+        result = runCommand(cmd)
         
         # Parse JSON output
         data = json.loads(result)
@@ -454,7 +465,7 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
     try:
         # Update index first
         cmd = cli_command + ['--json', 'core', 'update-index']
-        result = runCommand(' '.join(cmd))
+        result = runCommand(cmd)
         update_data = json.loads(result)
         
         if 'error' in update_data:
@@ -463,7 +474,7 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
         
         # Check if core is installed
         cmd = cli_command + ['--json', 'core', 'list']
-        result = runCommand(' '.join(cmd))
+        result = runCommand(cmd)
         cores_data = json.loads(result)
         platforms = get_platform_list(cores_data)
         
@@ -478,7 +489,7 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
         
         # Check for available updates
         cmd = cli_command + ['--json', 'core', 'list', '--updatable']
-        result = runCommand(' '.join(cmd))
+        result = runCommand(cmd)
         updates_data = json.loads(result)
         updatable_platforms = get_platform_list(updates_data)
         
@@ -510,7 +521,7 @@ def reinstall_core(send_text, core_name: str) -> Tuple[bool, str]:
         
         # Check if core exists using JSON output
         cmd = cli_command + ['--json', 'core', 'list']
-        result = runCommand(' '.join(cmd))
+        result = runCommand(cmd)
         cores_data = json.loads(result)
         platforms = get_platform_list(cores_data)
         
@@ -555,7 +566,7 @@ def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
         if status == 0:
             # Double-check for updates with JSON output
             cmd = cli_command + ['--json', 'core', 'list', '--updatable']
-            result = runCommand(' '.join(cmd))
+            result = runCommand(cmd)
             updates_data = json.loads(result)
             updatable_platforms = get_platform_list(updates_data)
             
@@ -606,7 +617,7 @@ def is_board_url_configured(url: str) -> bool:
     try:
         # Get current config
         cmd = cli_command + ['config', 'dump', '--format', 'json']
-        result = runCommand(' '.join(cmd))
+        result = runCommand(cmd)
         
         # Parse JSON output
         config = json.loads(result)
@@ -772,7 +783,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
             append_compiler_log(send_text, _("Installing library: {lib}").format(lib=lib) + '\n')
             try:
                 cmd = cli_command + ['lib', 'install', lib]
-                result = runCommand(' '.join(cmd))
+                result = runCommand(cmd)
             except Exception as e:
                 append_compiler_log(send_text, _("Error installing library {lib}: {error}").format(lib=lib, error=str(e)) + '\n')
                 return False
