@@ -28,7 +28,7 @@ OPLC_DEPS = [
     'CONTROLLINO',
     'PubSubClient',
     'ArduinoJson',
-    'arduinomqttclient',
+    'ArduinoMqttClient',
     'RP2040_PWM',
     'AVR_PWM',
     'megaAVR_PWM',
@@ -236,6 +236,43 @@ def log_host_info(send_text):
     path_content = os.environ.get('PATH', '')
     append_compiler_log(send_text, "\n" + _("active PATH Variable") + ":\n" + path_content + "\n\n")
 
+def are_libraries_installed(lib_list: List[str]) -> List[str]:
+    """
+    Check if the specified Arduino libraries are installed.
+    
+    Args:
+        lib_list: List of library names to check
+        
+    Returns:
+        List[str]: List of libraries that are not installed
+    """
+    try:
+        # Get list of installed libraries in JSON format
+        cmd = cli_command + ['--json', 'lib', 'list']
+        result = runCommand(' '.join(cmd))
+        
+        if not result:
+            return lib_list
+            
+        # Parse JSON output
+        libraries_data = json.loads(result)
+        
+        # Get set of installed library names
+        installed_libs = {
+            lib.get('library', {}).get('name')
+            for lib in libraries_data.get('installed_libraries', [])
+        }
+        
+        # Return list of libraries that are not in installed set
+        return [lib for lib in lib_list if lib not in installed_libs]
+        
+    except json.JSONDecodeError as e:
+        append_compiler_log(send_text, _("Error parsing JSON output while checking libraries: {error}").format(error=str(e)) + '\n')
+        return lib_list
+    except Exception as e:
+        append_compiler_log(send_text, _("Error checking libraries: {error}").format(error=str(e)) + '\n')
+        return lib_list
+
 def check_libraries_status() -> Tuple[int, str]:
     """
     Check the status of Arduino libraries using JSON output format.
@@ -331,7 +368,7 @@ def upgrade_libraries(send_text) -> Tuple[bool, str]:
     try:
         # Update library index
         cmd = cli_command + ['lib', 'update-index']
-        runCommand(' '.join(cmd))
+        runCommandToWin(send_text, cmd)
         
         # Check for updates
         status, message = check_libraries_status()
@@ -347,6 +384,24 @@ def upgrade_libraries(send_text) -> Tuple[bool, str]:
             
     except Exception as e:
         return (False, _("Libraries upgrade failed: {error_message}").format(error_message=str(e)))
+
+def get_platform_list(json_data: dict) -> List[dict]:
+    """
+    Safely extracts the platforms array from Arduino CLI JSON output.
+    
+    Args:
+        json_data: Dictionary parsed from Arduino CLI JSON output
+        
+    Returns:
+        List[dict]: List of platform dictionaries, empty list if no platforms or invalid data
+    """
+    platforms = json_data.get('platforms')
+    
+    # Check if platforms exists and is a list/tuple
+    if platforms is None or not isinstance(platforms, (list, tuple)):
+        return []
+        
+    return platforms
 
 def get_core_version(core_id: str) -> Optional[str]:
     """
@@ -369,9 +424,10 @@ def get_core_version(core_id: str) -> Optional[str]:
         
         # Parse JSON output
         data = json.loads(result)
+        platforms = get_platform_list(data)
         
         # Search for the specified core
-        for platform in data.get('platforms', []):
+        for platform in platforms:
             if platform.get('id') == core_id:
                 return platform.get('installed_version')
                 
@@ -409,9 +465,10 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
         cmd = cli_command + ['--json', 'core', 'list']
         result = runCommand(' '.join(cmd))
         cores_data = json.loads(result)
+        platforms = get_platform_list(cores_data)
         
         core_found = False
-        for platform in cores_data.get('platforms', []):
+        for platform in platforms:
             if platform.get('id') == core_name:
                 core_found = True
                 break
@@ -423,8 +480,9 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
         cmd = cli_command + ['--json', 'core', 'list', '--updatable']
         result = runCommand(' '.join(cmd))
         updates_data = json.loads(result)
+        updatable_platforms = get_platform_list(updates_data)
         
-        for platform in updates_data.get('platforms', []):
+        for platform in updatable_platforms:
             if platform.get('id') == core_name:
                 return (2, _("Updates found for {core_name}").format(core_name=core_name))
         
@@ -435,36 +493,6 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
     except Exception as e:
         return (2, _("Error checking core: {error_message}").format(error_message=str(e)))
     
-# def upgrade_core(core_name: str) -> Tuple[bool, str]:
-#     """
-#     Performs only upgrade of core without reinstallation.
-#
-#     Args:
-#         core_name: Name of the core (e.g. "esp32:esp32")
-#
-#     Returns:
-#         Tuple[bool, str]: (Success, Description)
-#     """
-#     try:
-#         # Update index first
-#         cmd = cli_command + ['core', 'update-index']
-#         runCommand(' '.join(cmd))
-#
-#         # Check if upgrade is available
-#         cmd = cli_command + ['core', 'list', '--updatable']
-#         updatable = runCommand(' '.join(cmd))
-#
-#         if core_name not in updatable:
-#             return (True, "No upgrade needed")
-#
-#         # Perform upgrade
-#         cmd = cli_command + ['core', 'upgrade', core_name]
-#         result = runCommand(' '.join(cmd))
-#         return (True, f"Core upgrade completed: {result}")
-#
-#     except Exception as e:
-#         return (False, f"Core upgrade failed: {str(e)}")
-
 def reinstall_core(send_text, core_name: str) -> Tuple[bool, str]:
     """
     Forces complete reinstallation of core.
@@ -478,13 +506,21 @@ def reinstall_core(send_text, core_name: str) -> Tuple[bool, str]:
     try:
         # Update index first
         cmd = cli_command + ['core', 'update-index']
-        runCommand(' '.join(cmd))
+        runCommandToWin(send_text, cmd)
+        
+        # Check if core exists using JSON output
+        cmd = cli_command + ['--json', 'core', 'list']
+        result = runCommand(' '.join(cmd))
+        cores_data = json.loads(result)
+        platforms = get_platform_list(cores_data)
+        
+        core_installed = any(
+            platform.get('id') == core_name 
+            for platform in platforms
+        )
         
         # Remove core if exists
-        cmd = cli_command + ['core', 'list']
-        installed = runCommand(' '.join(cmd))
-        
-        if core_name in installed:
+        if core_installed:
             cmd = cli_command + ['core', 'uninstall', core_name]
             runCommandToWin(send_text, cmd)
         
@@ -511,16 +547,24 @@ def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
     try:
         # Update index
         cmd = cli_command + ['core', 'update-index']
-        result = runCommand(' '.join(cmd))
+        result = runCommandToWin(send_text, cmd)
         
         # Check status
         status, message = check_core_status(core_name)
         
         if status == 0:
-            # Double-check for updates
-            cmd = cli_command + ['core', 'list', '--updatable']
-            updatable = runCommand(' '.join(cmd))
-            if core_name in updatable:
+            # Double-check for updates with JSON output
+            cmd = cli_command + ['--json', 'core', 'list', '--updatable']
+            result = runCommand(' '.join(cmd))
+            updates_data = json.loads(result)
+            updatable_platforms = get_platform_list(updates_data)
+            
+            core_needs_update = any(
+                platform.get('id') == core_name 
+                for platform in updatable_platforms
+            )
+            
+            if core_needs_update:
                 cmd = cli_command + ['core', 'upgrade', core_name]
                 result = runCommandToWin(send_text, cmd)
                 if result != 0:
@@ -575,7 +619,7 @@ def is_board_url_configured(url: str) -> bool:
         print(f"Error checking board URL configuration: {e}")
         return False
 
-def build(st_file, port, send_text, board_hal, build_option):
+def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, build_option):
     """
     Build and optionally upload Arduino program with specified build cache options.
     
@@ -589,6 +633,7 @@ def build(st_file, port, send_text, board_hal, build_option):
     
     arduino_platform = board_hal['platform']
     source_file = board_hal['source']
+    required_libs = OPLC_DEPS   # in the future this might take project libraries, board specific libraries and extension specific libraries too
 
     def setup_environment() -> bool:
         global base_path, cli_command, iec_transpiler
@@ -603,7 +648,7 @@ def build(st_file, port, send_text, board_hal, build_option):
         
         # Setup CLI command based on platform
         if os_platform.system() == 'Windows':
-            cli_command = [os.path.abspath('editor\\arduino\\bin\\arduino-cli-w64'), '--no-color']
+            cli_command = [os.path.abspath('editor\\arduino\\bin\\arduino-cli-w64.exe'), '--no-color']
             iec_transpiler = os.path.abspath('editor/arduino/bin/iec2c.exe')
         elif os_platform.system() == 'Darwin':
             cli_command = [os.path.abspath('editor/arduino/bin/arduino-cli-mac'), '--no-color']
@@ -687,7 +732,65 @@ def build(st_file, port, send_text, board_hal, build_option):
         append_compiler_log(send_text, f'\n')
         return True
 
-    def handle_libraries() -> bool:
+    def check_required_libraries() -> bool:
+        """
+        Check if all required libraries are installed and install missing ones.
+        
+        Inputs:
+            send_text: Function to handle output messages
+            required_libs: List of required library names
+            
+        Returns:
+            bool: True if all libraries are installed or were successfully installed,
+                  False if any library couldn't be installed
+        """
+        append_compiler_log(send_text, _("Checking required libraries...") + '\n')
+        
+        # Check which libraries need to be installed
+        missing_libs = are_libraries_installed(required_libs)
+        
+        if not missing_libs:
+            append_compiler_log(send_text, _("All required libraries are already installed.") + '\n')
+            return True
+        
+        # Update the library index before installation
+        try:
+            cmd = cli_command + ['lib', 'update-index']
+            result = runCommandToWin(send_text, cmd)
+        except Exception as e:
+            append_compiler_log(send_text, _("Error updating library index: {error}").format(error=str(e)) + '\n')
+            return False
+        
+        # Try to install missing libraries
+        append_compiler_log(send_text, _n(
+            "Installing {count} missing library",
+            "Installing {count} missing libraries",
+            len(missing_libs)
+        ).format(count=len(missing_libs)) + '\n')
+        
+        for lib in missing_libs:
+            append_compiler_log(send_text, _("Installing library: {lib}").format(lib=lib) + '\n')
+            try:
+                cmd = cli_command + ['lib', 'install', lib]
+                result = runCommand(' '.join(cmd))
+            except Exception as e:
+                append_compiler_log(send_text, _("Error installing library {lib}: {error}").format(lib=lib, error=str(e)) + '\n')
+                return False
+        
+        # Verify all libraries are now installed
+        still_missing = are_libraries_installed(required_libs)
+        if still_missing:
+            append_compiler_log(send_text, _n(
+                "Failed to install {count} library: {libs}",
+                "Failed to install {count} libraries: {libs}",
+                len(still_missing)
+            ).format(count=len(still_missing), libs=', '.join(still_missing)) + '\n')
+            return False
+            
+        append_compiler_log(send_text, _("All required libraries have been successfully installed.") + '\n')
+        return True
+
+    def update_libraries() -> bool:
         global cli_command
         append_compiler_log(send_text, _('Checking Libraries status...') + '\n')
         libraries_status, message = check_libraries_status()
@@ -726,9 +829,69 @@ def build(st_file, port, send_text, board_hal, build_option):
         # Copy HAL file
         shutil.copyfile(f'{base_path}/hal/{source_file}', f'{base_path}/arduino.cpp')
         
-        # TODO: create defines.h
-
         return True
+
+    def write_definitions_file():
+        """
+        Write definitions array to defines.h file
+        
+        Inputs:
+            definitions (list): List of definition strings
+            base_path (str): Base path for Arduino project
+            send_text (callable): Function to handle output messages
+            
+        Returns:
+            bool: True if successful, False if error occurred
+        """
+        defines_path = os.path.join(base_path, 'defines.h')
+        
+        try:
+            with open(defines_path, 'w') as f:
+                content = '\n'.join(definitions)
+                f.write(content)
+                f.flush()
+            return True
+                
+        except IOError as e:
+            append_compiler_log(send_text, _("Error writing defines.h: {err_msg}\n").format(err_msg=str(e)))
+            return False
+        
+    def write_arduino_sketch():
+        """
+        Write Arduino sketch to header file if sketch exists
+        
+        Inputs:
+            arduino_sketch (str): Arduino sketch content or None
+            base_path (str): Base path for Arduino project
+            send_text (callable): Function to handle output messages
+            
+        Returns:
+            bool: True if successful or no sketch provided, False if error occurred
+        """
+        sketch_path = os.path.join(base_path, 'ext', 'arduino_sketch.h')
+        
+            # Delete existing file if it exists
+        try:
+            os.remove(sketch_path)
+        except FileNotFoundError:
+            pass  # File doesn't exist yet - that's fine
+        except OSError as e:
+            append_compiler_log(send_text, _("Error removing old arduino_sketch.h: {err_msg}\n").format(err_msg=str(e)))
+            return False
+    
+        if arduino_sketch is None:
+            return True
+            
+        try:
+            os.makedirs(os.path.dirname(sketch_path), exist_ok=True)
+            with open(sketch_path, 'w') as f:
+                f.write(arduino_sketch)
+                f.flush()
+            return True
+                
+        except (IOError, OSError) as e:
+            append_compiler_log(send_text, _("Error writing arduino_sketch.h: {err_msg}\n").format(err_msg=str(e)))
+            return False
     
     def generate_glue_code() -> bool:
         global base_path
@@ -974,9 +1137,12 @@ void updateTime()
         setup_environment,
         verify_prerequisites,
         handle_board_installation,
-        handle_libraries,
+        check_required_libraries,
+        update_libraries,
         compile_st_file,
         provide_hal_data,
+        write_definitions_file,
+        write_arduino_sketch,
         generate_glue_code,
         patch_generated_files,
         build_project,

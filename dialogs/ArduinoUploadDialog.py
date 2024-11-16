@@ -41,6 +41,7 @@ class ArduinoUploadDialog(wx.Dialog):
         """
         self.plc_program = st_code
         self.arduino_sketch = arduino_ext
+        self.definitions = []
         self.md5 = md5
         self.settings = {}
         current_dir = paths.AbsDir(__file__)
@@ -670,7 +671,7 @@ class ArduinoUploadDialog(wx.Dialog):
                 'version': board_hal.get('version', None)
             }
         
-        self.generateDefinitionsFile()
+        self.generateDefinitions()
 
         port = "None" #invalid port
         if (self.check_compile.GetValue() == True):
@@ -701,7 +702,11 @@ class ArduinoUploadDialog(wx.Dialog):
         wx.YieldIfNeeded()
 
         # now create the build thread
-        compiler_thread = threading.Thread(target=builder.build, args=(self.plc_program, port, send_text, board_hal, self.active_build_option))
+        compiler_thread = threading.Thread(
+            target=builder.build,
+            args=(self.plc_program, self.definitions, self.arduino_sketch, port, send_text, board_hal, 
+                  self.active_build_option)
+        )
         compiler_thread.start()
         compiler_thread.join()
         
@@ -735,101 +740,184 @@ class ArduinoUploadDialog(wx.Dialog):
         builder_thread = threading.Thread(target=self.startBuilder)
         builder_thread.start()
 
-    def generateDefinitionsFile(self):
+    # def generateDefinitionsFile(self):
+    #
+    #     if platform.system() == 'Windows':
+    #         base_path = 'editor\\arduino\\examples\\Baremetal\\'
+    #     else:
+    #         base_path = 'editor/arduino/examples/Baremetal/'
+    #
+    #     #Store program MD5 on target
+    #     define_file = '//Program MD5\n'
+    #     define_file += '#define PROGRAM_MD5 "' + str(self.md5) + '"\n'
+    #
+    #     #Generate Communication Config defines
+    #     define_file += '//Comms configurations\n'
+    #
+    #     define_file += '#define MBSERIAL_IFACE ' + str(self.serial_iface_combo.GetValue()) + '\n'
+    #     define_file += '#define MBSERIAL_BAUD ' + str(self.baud_rate_combo.GetValue()) + '\n'
+    #     define_file += '#define MBSERIAL_SLAVE ' + str(self.slaveid_txt.GetValue()) + '\n'
+    #     define_file += '#define MBTCP_MAC ' + str(self.mac_txt.GetValue()) + '\n'
+    #     define_file += '#define MBTCP_IP ' + str(self.ip_txt.GetValue()).replace('.',',') + '\n'
+    #     define_file += '#define MBTCP_DNS ' + str(self.dns_txt.GetValue()).replace('.',',') + '\n'
+    #     define_file += '#define MBTCP_GATEWAY ' + str(self.gateway_txt.GetValue()).replace('.',',') + '\n'
+    #     define_file += '#define MBTCP_SUBNET ' + str(self.subnet_txt.GetValue()).replace('.',',') + '\n'
+    #     define_file += '#define MBTCP_SSID "' + str(self.wifi_ssid_txt.GetValue()) + '"\n'
+    #     define_file += '#define MBTCP_PWD "' + str(self.wifi_pwd_txt.GetValue()) + '"\n'
+    #
+    #     if (self.check_modbus_serial.GetValue() == True):
+    #         define_file += '#define MBSERIAL\n'
+    #         define_file += '#define MODBUS_ENABLED\n'
+    #
+    #     if (self.txpin_txt.GetValue() != '-1'):
+    #         define_file += '#define MBSERIAL_TXPIN ' + str(self.txpin_txt.GetValue()) + '\n'
+    #
+    #     if (self.check_modbus_tcp.GetValue() == True):
+    #         define_file += '#define MBTCP\n'
+    #         define_file += '#define MODBUS_ENABLED\n'
+    #         if (self.tcp_iface_combo.GetValue() == u"Ethernet"):
+    #             define_file += '#define MBTCP_ETHERNET\n'
+    #         elif (self.tcp_iface_combo.GetValue() == u'WiFi'):
+    #             define_file += '#define MBTCP_WIFI\n'
+    #
+    #     #Generate IO Config defines
+    #     define_file += '\n\n//IO Config\n'
+    #     define_file += '#define PINMASK_DIN ' + str(self.din_txt.GetValue()) + '\n'
+    #     define_file += '#define PINMASK_AIN ' + str(self.ain_txt.GetValue()) + '\n'
+    #     define_file += '#define PINMASK_DOUT ' + str(self.dout_txt.GetValue()) + '\n'
+    #     define_file += '#define PINMASK_AOUT ' + str(self.aout_txt.GetValue()) + '\n'
+    #     define_file += '#define NUM_DISCRETE_INPUT ' + str(len(str(self.din_txt.GetValue()).split(','))) + '\n'
+    #     define_file += '#define NUM_ANALOG_INPUT ' + str(len(str(self.ain_txt.GetValue()).split(','))) + '\n'
+    #     define_file += '#define NUM_DISCRETE_OUTPUT ' + str(len(str(self.dout_txt.GetValue()).split(','))) + '\n'
+    #     define_file += '#define NUM_ANALOG_OUTPUT ' + str(len(str(self.aout_txt.GetValue()).split(','))) + '\n'
+    #
+    #     # Get define from hals
+    #     board_type = self.board_type_combo.GetValue().split(" [")[0]
+    #     if 'define' in self.hals[board_type]:
+    #         define_file += '#define '+ self.hals[board_type]['define'] +'\n'
+    #
+    #     define_file += '\n\n//Arduino Libraries\n'
+    #
+    #     #Generate Arduino Libraries defines
+    #     if (self.plc_program.find('DS18B20;') > 0) or (self.plc_program.find('DS18B20_2_OUT;') > 0) or (self.plc_program.find('DS18B20_3_OUT;') > 0) or (self.plc_program.find('DS18B20_4_OUT;') > 0) or (self.plc_program.find('DS18B20_5_OUT;') > 0):
+    #         define_file += '#define USE_DS18B20_BLOCK\n'
+    #     if (self.plc_program.find('P1AM_INIT;') > 0):
+    #         define_file += '#define USE_P1AM_BLOCKS\n'
+    #     if (self.plc_program.find('CLOUD_BEGIN;') > 0):
+    #         define_file += '#define USE_CLOUD_BLOCKS\n'
+    #     if (self.plc_program.find('MQTT_CONNECT;') > 0) or (self.plc_program.find('MQTT_CONNECT_AUTH;') > 0):
+    #         define_file += '#define USE_MQTT_BLOCKS\n'
+    #     if (self.plc_program.find('ARDUINOCAN_CONF;') > 0):
+    #         define_file += '#define USE_ARDUINOCAN_BLOCK\n'
+    #     elif (self.plc_program.find('ARDUINOCAN_WRITE;') > 0):
+    #         define_file += '#define USE_ARDUINOCAN_BLOCK\n'
+    #     elif (self.plc_program.find('ARDUINOCAN_WRITE_WORD;') > 0):
+    #         define_file += '#define USE_ARDUINOCAN_BLOCK\n'
+    #     elif (self.plc_program.find('ARDUINOCAN_READ;') > 0):
+    #         define_file += '#define USE_ARDUINOCAN_BLOCK\n'
+    #     if (self.plc_program.find('STM32CAN_CONF;') > 0):
+    #         define_file += '#define USE_STM32CAN_BLOCK\n'
+    #     elif (self.plc_program.find('STM32CAN_WRITE;') > 0):
+    #         define_file += '#define USE_STM32CAN_BLOCK\n'
+    #     elif (self.plc_program.find('STM32CAN_READ;') > 0):
+    #         define_file += '#define USE_STM32CAN_BLOCK\n'
+    #
+    #     #Generate Arduino Extension (sketch) define
+    #     if self.arduino_sketch != None:
+    #         define_file += '#define USE_ARDUINO_SKETCH\n'
+    #         define_file += '#define ARDUINO_PLATFORM\n'
+    #         #Copy the sketch contents to the .h file
+    #         f = open(os.path.join(base_path, 'ext', 'arduino_sketch.h'), 'w')
+    #         f.write(self.arduino_sketch)
+    #
+    #     #Write file to disk
+    #     f = open(base_path+'defines.h', 'w')
+    #     f.write(define_file)
+    #     f.flush()
+    #     f.close()
 
-        if platform.system() == 'Windows':
-            base_path = 'editor\\arduino\\examples\\Baremetal\\'
-        else:
-            base_path = 'editor/arduino/examples/Baremetal/'
+    def generateDefinitions(self):
+        """Generate definitions and store them in the object"""
+        self.definitions = []  # Reset definitions array
+        
+        # Program MD5
+        self.definitions.extend([
+            '//Program MD5',
+            f'#define PROGRAM_MD5 "{str(self.md5)}"'
+        ])
 
-        #Store program MD5 on target
-        define_file = '//Program MD5\n'
-        define_file += '#define PROGRAM_MD5 "' + str(self.md5) + '"\n'
+        # Communication Config defines
+        self.definitions.extend([
+            '//Comms configurations',
+            f'#define MBSERIAL_IFACE {str(self.serial_iface_combo.GetValue())}',
+            f'#define MBSERIAL_BAUD {str(self.baud_rate_combo.GetValue())}',
+            f'#define MBSERIAL_SLAVE {str(self.slaveid_txt.GetValue())}',
+            f'#define MBTCP_MAC {str(self.mac_txt.GetValue())}',
+            f'#define MBTCP_IP {str(self.ip_txt.GetValue()).replace(".",",")}',
+            f'#define MBTCP_DNS {str(self.dns_txt.GetValue()).replace(".",",")}',
+            f'#define MBTCP_GATEWAY {str(self.gateway_txt.GetValue()).replace(".",",")}',
+            f'#define MBTCP_SUBNET {str(self.subnet_txt.GetValue()).replace(".",",")}',
+            f'#define MBTCP_SSID "{str(self.wifi_ssid_txt.GetValue())}"',
+            f'#define MBTCP_PWD "{str(self.wifi_pwd_txt.GetValue())}"'
+        ])
 
-        #Generate Communication Config defines
-        define_file += '//Comms configurations\n'
+        if self.check_modbus_serial.GetValue():
+            self.definitions.extend([
+                '#define MBSERIAL',
+                '#define MODBUS_ENABLED'
+            ])
 
-        define_file += '#define MBSERIAL_IFACE ' + str(self.serial_iface_combo.GetValue()) + '\n'
-        define_file += '#define MBSERIAL_BAUD ' + str(self.baud_rate_combo.GetValue()) + '\n'
-        define_file += '#define MBSERIAL_SLAVE ' + str(self.slaveid_txt.GetValue()) + '\n'
-        define_file += '#define MBTCP_MAC ' + str(self.mac_txt.GetValue()) + '\n'
-        define_file += '#define MBTCP_IP ' + str(self.ip_txt.GetValue()).replace('.',',') + '\n'
-        define_file += '#define MBTCP_DNS ' + str(self.dns_txt.GetValue()).replace('.',',') + '\n'
-        define_file += '#define MBTCP_GATEWAY ' + str(self.gateway_txt.GetValue()).replace('.',',') + '\n'
-        define_file += '#define MBTCP_SUBNET ' + str(self.subnet_txt.GetValue()).replace('.',',') + '\n'
-        define_file += '#define MBTCP_SSID "' + str(self.wifi_ssid_txt.GetValue()) + '"\n'
-        define_file += '#define MBTCP_PWD "' + str(self.wifi_pwd_txt.GetValue()) + '"\n'
+        if self.txpin_txt.GetValue() != '-1':
+            self.definitions.append(f'#define MBSERIAL_TXPIN {str(self.txpin_txt.GetValue())}')
 
-        if (self.check_modbus_serial.GetValue() == True):
-            define_file += '#define MBSERIAL\n'
-            define_file += '#define MODBUS_ENABLED\n'
+        if self.check_modbus_tcp.GetValue():
+            self.definitions.append('#define MBTCP')
+            self.definitions.append('#define MODBUS_ENABLED')
+            if self.tcp_iface_combo.GetValue() == "Ethernet":
+                self.definitions.append('#define MBTCP_ETHERNET')
+            elif self.tcp_iface_combo.GetValue() == 'WiFi':
+                self.definitions.append('#define MBTCP_WIFI')
 
-        if (self.txpin_txt.GetValue() != '-1'):
-            define_file += '#define MBSERIAL_TXPIN ' + str(self.txpin_txt.GetValue()) + '\n'
-
-        if (self.check_modbus_tcp.GetValue() == True):
-            define_file += '#define MBTCP\n'
-            define_file += '#define MODBUS_ENABLED\n'
-            if (self.tcp_iface_combo.GetValue() == u"Ethernet"):
-                define_file += '#define MBTCP_ETHERNET\n'
-            elif (self.tcp_iface_combo.GetValue() == u'WiFi'):
-                define_file += '#define MBTCP_WIFI\n'
-
-        #Generate IO Config defines
-        define_file += '\n\n//IO Config\n'
-        define_file += '#define PINMASK_DIN ' + str(self.din_txt.GetValue()) + '\n'
-        define_file += '#define PINMASK_AIN ' + str(self.ain_txt.GetValue()) + '\n'
-        define_file += '#define PINMASK_DOUT ' + str(self.dout_txt.GetValue()) + '\n'
-        define_file += '#define PINMASK_AOUT ' + str(self.aout_txt.GetValue()) + '\n'
-        define_file += '#define NUM_DISCRETE_INPUT ' + str(len(str(self.din_txt.GetValue()).split(','))) + '\n'
-        define_file += '#define NUM_ANALOG_INPUT ' + str(len(str(self.ain_txt.GetValue()).split(','))) + '\n'
-        define_file += '#define NUM_DISCRETE_OUTPUT ' + str(len(str(self.dout_txt.GetValue()).split(','))) + '\n'
-        define_file += '#define NUM_ANALOG_OUTPUT ' + str(len(str(self.aout_txt.GetValue()).split(','))) + '\n'
+        # IO Config defines
+        self.definitions.extend([
+            '\n\n//IO Config',
+            f'#define PINMASK_DIN {str(self.din_txt.GetValue())}',
+            f'#define PINMASK_AIN {str(self.ain_txt.GetValue())}',
+            f'#define PINMASK_DOUT {str(self.dout_txt.GetValue())}',
+            f'#define PINMASK_AOUT {str(self.aout_txt.GetValue())}',
+            f'#define NUM_DISCRETE_INPUT {str(len(str(self.din_txt.GetValue()).split(",")))}',
+            f'#define NUM_ANALOG_INPUT {str(len(str(self.ain_txt.GetValue()).split(",")))}',
+            f'#define NUM_DISCRETE_OUTPUT {str(len(str(self.dout_txt.GetValue()).split(",")))}',
+            f'#define NUM_ANALOG_OUTPUT {str(len(str(self.aout_txt.GetValue()).split(",")))}'
+        ])
 
         # Get define from hals
         board_type = self.board_type_combo.GetValue().split(" [")[0]
         if 'define' in self.hals[board_type]:
-            define_file += '#define '+ self.hals[board_type]['define'] +'\n'
+            board_define = self.hals[board_type]['define']
+            # Handle both string and array cases
+            if isinstance(board_define, str):
+                self.definitions.append(f'#define {board_define}')
+            elif isinstance(board_define, list):
+                self.definitions.extend([f'#define {define}' for define in board_define])
 
-        define_file += '\n\n//Arduino Libraries\n'
+        # Arduino Libraries defines
+        self.definitions.append('\n\n//Arduino Libraries')
 
-        #Generate Arduino Libraries defines
-        if (self.plc_program.find('DS18B20;') > 0) or (self.plc_program.find('DS18B20_2_OUT;') > 0) or (self.plc_program.find('DS18B20_3_OUT;') > 0) or (self.plc_program.find('DS18B20_4_OUT;') > 0) or (self.plc_program.find('DS18B20_5_OUT;') > 0):
-            define_file += '#define USE_DS18B20_BLOCK\n'
-        if (self.plc_program.find('P1AM_INIT;') > 0):
-            define_file += '#define USE_P1AM_BLOCKS\n'
-        if (self.plc_program.find('CLOUD_BEGIN;') > 0):
-            define_file += '#define USE_CLOUD_BLOCKS\n'
-        if (self.plc_program.find('MQTT_CONNECT;') > 0) or (self.plc_program.find('MQTT_CONNECT_AUTH;') > 0):
-            define_file += '#define USE_MQTT_BLOCKS\n'
-        if (self.plc_program.find('ARDUINOCAN_CONF;') > 0):
-            define_file += '#define USE_ARDUINOCAN_BLOCK\n'
-        elif (self.plc_program.find('ARDUINOCAN_WRITE;') > 0):
-            define_file += '#define USE_ARDUINOCAN_BLOCK\n'
-        elif (self.plc_program.find('ARDUINOCAN_WRITE_WORD;') > 0):
-            define_file += '#define USE_ARDUINOCAN_BLOCK\n'
-        elif (self.plc_program.find('ARDUINOCAN_READ;') > 0):
-            define_file += '#define USE_ARDUINOCAN_BLOCK\n'
-        if (self.plc_program.find('STM32CAN_CONF;') > 0):
-            define_file += '#define USE_STM32CAN_BLOCK\n'
-        elif (self.plc_program.find('STM32CAN_WRITE;') > 0):
-            define_file += '#define USE_STM32CAN_BLOCK\n'
-        elif (self.plc_program.find('STM32CAN_READ;') > 0):
-            define_file += '#define USE_STM32CAN_BLOCK\n'
+        # Check for required libraries in PLC program
+        if any(lib in self.plc_program for lib in ['DS18B20;', 'DS18B20_2_OUT;', 'DS18B20_3_OUT;', 'DS18B20_4_OUT;', 'DS18B20_5_OUT;']):
+            self.definitions.append('#define USE_DS18B20_BLOCK')
+        if 'P1AM_INIT;' in self.plc_program:
+            self.definitions.append('#define USE_P1AM_BLOCKS')
+        if 'CLOUD_BEGIN;' in self.plc_program:
+            self.definitions.append('#define USE_CLOUD_BLOCKS')
+        if 'MQTT_CONNECT;' in self.plc_program or 'MQTT_CONNECT_AUTH;' in self.plc_program:
+            self.definitions.append('#define USE_MQTT_BLOCKS')
+        if any(can_func in self.plc_program for can_func in ['ARDUINOCAN_CONF;', 'ARDUINOCAN_WRITE;', 'ARDUINOCAN_WRITE_WORD;', 'ARDUINOCAN_READ;']):
+            self.definitions.append('#define USE_ARDUINOCAN_BLOCK')
+        if any(stm_func in self.plc_program for stm_func in ['STM32CAN_CONF;', 'STM32CAN_WRITE;', 'STM32CAN_READ;']):
+            self.definitions.append('#define USE_STM32CAN_BLOCK')
 
-        #Generate Arduino Extension (sketch) define
-        if self.arduino_sketch != None:
-            define_file += '#define USE_ARDUINO_SKETCH\n'
-            define_file += '#define ARDUINO_PLATFORM\n'
-            #Copy the sketch contents to the .h file
-            f = open(os.path.join(base_path, 'ext', 'arduino_sketch.h'), 'w')
-            f.write(self.arduino_sketch)
-
-        #Write file to disk
-        f = open(base_path+'defines.h', 'w')
-        f.write(define_file)
-        f.flush()
-        f.close()
 
     def saveSettings(self, event=None):
         self.settings['board_type'] = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
@@ -992,7 +1080,7 @@ class ArduinoUploadDialog(wx.Dialog):
     def updateInstalledBoards(self):
         """Update the list of installed boards using arduino-cli's JSON output"""
         if platform.system() == 'Windows':
-            cli_command = 'editor\\arduino\\bin\\arduino-cli-w64'
+            cli_command = 'editor\\arduino\\bin\\arduino-cli-w64.exe'
         elif platform.system() == 'Darwin':
             cli_command = 'editor/arduino/bin/arduino-cli-mac'
         else:
@@ -1005,29 +1093,31 @@ class ArduinoUploadDialog(wx.Dialog):
             print("Error reading core list")
             return
     
-        try:
-            # Parse JSON output
-            core_data = json.loads(core_list)
-            
-            # Update installed boards in list
+        # Parse JSON output
+        core_data = json.loads(core_list)
+
+        # Check if platforms key exists and is an array
+        if 'platforms' not in core_data or not isinstance(core_data['platforms'], list):
+            # No installed platforms or invalid format - mark all as not installed
             for board in self.hals:
-                board_core = self.hals[board]['core']
-                version = '0'  # Default to not installed
-                
-                # Look for matching platform in JSON data
-                for arduino_platform in core_data['platforms']:
-                    if arduino_platform['id'] == board_core:
-                        version = arduino_platform['installed_version']
-                        break
-                        
-                self.hals[board]['version'] = version
-    
+                self.hals[board]['version'] = '0'
             self.saveHals()
-    
-        except json.JSONDecodeError:
-            print("Error parsing JSON output from arduino-cli")
-        except KeyError as e:
-            print(f"Unexpected JSON structure: {e}")
+            return
+
+        # Update installed boards in list
+        for board in self.hals:
+            board_core = self.hals[board]['core']
+            version = '0'  # Default to not installed
+
+            # Look for matching platform in JSON data
+            for arduino_platform in core_data['platforms']:
+                if arduino_platform['id'] == board_core:
+                    version = arduino_platform['installed_version']
+                    break
+
+            self.hals[board]['version'] = version
+
+        self.saveHals()
 
     # # Check if should update subsystem
     # if ('last_update' in board_hal):
