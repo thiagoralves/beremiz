@@ -529,7 +529,7 @@ def reinstall_core(send_text, core_name: str) -> Tuple[bool, str]:
     
     return (True, _("Core reinstallation completed.").format(result=result))
 
-def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
+def upgrade_core(send_text, core_name: str, status = None) -> Tuple[bool, str]:
     """
     Performs necessary update actions for a core.
     
@@ -544,8 +544,9 @@ def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
         cmd = _cli_command + ['core', 'update-index']
         result = runCommandToWin(send_text, cmd)
         
-        # Check status
-        status, message = check_core_status(core_name)
+        if status is None:
+            # Check status
+            status, message = check_core_status(core_name)
         
         if status == 0:
             # Double-check for updates with JSON output
@@ -697,7 +698,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
             
         # Handle core updates based on build option
         elif core_status >= 1 or build_option >= BuildCacheOption.UPGRADE_CORE:
-            success, message = upgrade_core(send_text, core)
+            success, message = upgrade_core(send_text, core, core_status)
             if not success:
                 append_compiler_log(send_text, f'\n{message}\n')
                 return False
