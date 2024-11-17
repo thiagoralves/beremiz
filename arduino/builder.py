@@ -835,6 +835,12 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
                             f.write(f'#define {define}\n')
                     
                     f.write('\n\n')
+
+                if arduino_sketch is not None:
+                    f.write('// Project defines\n')
+                    f.write('#define USE_ARDUINO_SKETCH\n')
+                    f.write('#define ARDUINO_PLATFORM\n')
+                    f.write('\n\n')
                             
                 content = '\n'.join(definitions)
                 f.write(content)
@@ -1129,8 +1135,8 @@ void updateTime()
         update_libraries,
         compile_st_file,
         provide_hal_data,
-        write_definitions_file,
         write_arduino_sketch,
+        write_definitions_file,
         generate_glue_code,
         patch_generated_files,
         build_project,
