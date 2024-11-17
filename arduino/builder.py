@@ -13,6 +13,7 @@ import select
 from typing import Tuple, Optional
 import re
 from gettext import ngettext as _n
+from pygments.styles import arduino
 # from asciidoc.a2x import cli
 
 # List of OPLC dependencies
@@ -41,14 +42,10 @@ OPLC_DEPS = [
 ]
 
 
-global base_path
-base_path = 'editor/arduino/src'
-
-global cli_command
-cli_command = []
-
-global iec_transpiler
-iec_transpiler = ''
+_arduino_src_path = 'editor/arduino/src'
+_arduino_ino_base_path = 'editor/arduino/examples/Baremetal'
+_cli_command = []
+_iec_transpiler = ''
 
 @unique
 class BuildCacheOption(Enum):
@@ -90,7 +87,7 @@ class BuildCacheOption(Enum):
         return NotImplemented
 
 def append_compiler_log(send_text, output):
-    log_file_path = os.path.join(base_path, 'build.log')
+    log_file_path = os.path.join(_arduino_src_path, 'build.log')
     try:
         with open(log_file_path, 'a', newline='') as log_file:
             lines = output.splitlines()
@@ -268,7 +265,7 @@ def are_libraries_installed(lib_list: List[str]) -> List[str]:
     """
     try:
         # Get list of installed libraries in JSON format
-        cmd = cli_command + ['--json', 'lib', 'list']
+        cmd = _cli_command + ['--json', 'lib', 'list']
         result = runCommand(cmd)
         
         if not result:
@@ -306,7 +303,7 @@ def check_libraries_status() -> Tuple[int, str]:
     """
     try:
         # Check for available updates using JSON format
-        cmd = cli_command + ['--json', 'lib', 'list', '--updatable']
+        cmd = _cli_command + ['--json', 'lib', 'list', '--updatable']
         json_output = runCommand(cmd)
         
         # Parse JSON output
@@ -330,7 +327,7 @@ def check_libraries_status() -> Tuple[int, str]:
     
 def get_installed_libraries(cli_command_str) -> List[str]:
     #print("Executing command:", cli_command_str + " lib list --json")
-    cmd = cli_command + ['--json', 'lib', 'list']
+    cmd = _cli_command + ['--json', 'lib', 'list']
     libraries_json = runCommand(cmd)
 
     libraries_data = json.loads(libraries_json)
@@ -344,11 +341,11 @@ def get_installed_libraries(cli_command_str) -> List[str]:
     #print("Installed libraries:", installed_libs)
     return installed_libs
 
-def clean_libraries(send_text, cli_command):
+def clean_libraries(send_text, _cli_command):
     # the intended behavior is to keep the list of installed libraries identical, but remove all and re-install all of them
     return_code = 0
     append_compiler_log(send_text, _("Cleaning libraries") + "...\n")
-    installed_libraries = get_installed_libraries(' '.join(cli_command))
+    installed_libraries = get_installed_libraries(' '.join(_cli_command))
 
     # Merge installed libraries with OPLC_DEPS and remove duplicates
     all_libraries: Set[str] = set(installed_libraries + OPLC_DEPS)
@@ -361,8 +358,8 @@ def clean_libraries(send_text, cli_command):
     
     for lib in all_libraries:
         append_compiler_log(send_text, _("Processing library: {lib}").format(lib=lib) + "\n")
-        runCommandToWin(send_text, cli_command + ['lib', 'uninstall', lib])
-        return_code = runCommandToWin(send_text, cli_command + ['lib', 'install', lib])
+        runCommandToWin(send_text, _cli_command + ['lib', 'uninstall', lib])
+        return_code = runCommandToWin(send_text, _cli_command + ['lib', 'install', lib])
         if (return_code != 0):
             append_compiler_log(send_text, '\n' + _('LIBRARIES INSTALLATION FAILED') + ': ' + lib + '\n')
             return
@@ -378,7 +375,7 @@ def upgrade_libraries(send_text) -> Tuple[bool, str]:
     """
     try:
         # Update library index
-        cmd = cli_command + ['lib', 'update-index']
+        cmd = _cli_command + ['lib', 'update-index']
         runCommandToWin(send_text, cmd)
         
         # Check for updates
@@ -389,30 +386,52 @@ def upgrade_libraries(send_text) -> Tuple[bool, str]:
             return (False, message)
             
         # Perform upgrade
-        cmd = cli_command + ['lib', 'upgrade']
+        cmd = _cli_command + ['lib', 'upgrade']
         result = runCommandToWin(send_text, cmd)
         return (True, _("Libraries upgrade completed."))
             
     except Exception as e:
         return (False, _("Libraries upgrade failed: {error_message}").format(error_message=str(e)))
 
-def get_platform_list(json_data: dict) -> List[dict]:
+def get_cores_json(updatable: bool = False) -> dict:
     """
-    Safely extracts the platforms array from Arduino CLI JSON output.
+    Get JSON data of available Arduino cores.
     
     Args:
-        json_data: Dictionary parsed from Arduino CLI JSON output
+        updatable: If True, only return cores with available updates
         
     Returns:
-        List[dict]: List of platform dictionaries, empty list if no platforms or invalid data
-    """
-    platforms = json_data.get('platforms')
-    
-    # Check if platforms exists and is a list/tuple
-    if platforms is None or not isinstance(platforms, (list, tuple)):
-        return []
+        dict: Parsed JSON data of available cores. Empty dict if input is not a dict.
+        The 'platforms' member will always be a list/tuple.
         
-    return platforms
+    Raises:
+        json.JSONDecodeError: If JSON parsing fails
+        subprocess.CalledProcessError: If command execution fails
+    """
+    # Build command
+    cmd = _cli_command + ['--json', 'core', 'list']
+    if updatable:
+        cmd.append('--updatable')
+        
+    # Run command and get output
+    result = runCommand(cmd)
+    
+    # Parse JSON output
+    cores_data = json.loads(result)
+    
+    # Return empty dict if input is not a dict
+    if not isinstance(cores_data, dict):
+        return {}
+        
+    # Extract and validate platforms array, defaulting to empty list if not found
+    platforms = cores_data.get('platforms', [])
+    if not isinstance(platforms, (list, tuple)):
+        platforms = []
+    
+    # Update platforms member with validated data
+    cores_data['platforms'] = platforms
+    
+    return cores_data
 
 def get_core_version(core_id: str) -> Optional[str]:
     """
@@ -423,30 +442,15 @@ def get_core_version(core_id: str) -> Optional[str]:
         
     Returns:
         The installed version as string or None if core is not installed
-        
-    Example:
-        >>> get_core_version('esp32:esp32')
-        '2.0.11'
     """
-    try:
-        # Run arduino-cli command and capture output
-        cmd = cli_command + ['--json', 'core', 'list']
-        result = runCommand(cmd)
-        
-        # Parse JSON output
-        data = json.loads(result)
-        platforms = get_platform_list(data)
-        
-        # Search for the specified core
-        for platform in platforms:
-            if platform.get('id') == core_id:
-                return platform.get('installed_version')
-                
-        return None
-        
-    except json.JSONDecodeError as e:
-        print(f"Error parsing JSON output: {e}")
-        return None
+    cores_data = get_cores_json()
+    
+    # Search for the specified core
+    for platform in cores_data['platforms']:
+        if platform.get('id') == core_id:
+            return platform.get('installed_version')
+            
+    return None
 
 def check_core_status(core_name: str) -> Tuple[int, str]:
     """
@@ -462,47 +466,34 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
         1 - First installation needed
         2 - Reinstallation recommended
     """
-    try:
-        # Update index first
-        cmd = cli_command + ['--json', 'core', 'update-index']
-        result = runCommand(cmd)
-        update_data = json.loads(result)
-        
-        if 'error' in update_data:
-            return (2, _("Error updating core index: {error}").format(
-                error=update_data.get('error', 'Unknown error')))
-        
-        # Check if core is installed
-        cmd = cli_command + ['--json', 'core', 'list']
-        result = runCommand(cmd)
-        cores_data = json.loads(result)
-        platforms = get_platform_list(cores_data)
-        
-        core_found = False
-        for platform in platforms:
-            if platform.get('id') == core_name:
-                core_found = True
-                break
-                
-        if not core_found:
-            return (1, _("Core {core_name} is not installed").format(core_name=core_name))
-        
-        # Check for available updates
-        cmd = cli_command + ['--json', 'core', 'list', '--updatable']
-        result = runCommand(cmd)
-        updates_data = json.loads(result)
-        updatable_platforms = get_platform_list(updates_data)
-        
-        for platform in updatable_platforms:
-            if platform.get('id') == core_name:
-                return (2, _("Updates found for {core_name}").format(core_name=core_name))
-        
-        return (0, _("No updates available for {core_name}").format(core_name=core_name))
+    cmd = _cli_command + ['--json', 'core', 'update-index']
+    result = runCommand(cmd)
+    update_data = json.loads(result)
+    
+    if 'error' in update_data:
+        return (2, _("Error updating core index: {error}").format(
+            error=update_data.get('error', 'Unknown error')))
+    
+    # Check if core is installed using get_cores_json()
+    cores_data = get_cores_json()
+    
+    core_found = False
+    for platform in cores_data['platforms']:
+        if platform.get('id') == core_name:
+            core_found = True
+            break
             
-    except json.JSONDecodeError as e:
-        return (2, _("Error parsing JSON output: {error_message}").format(error_message=str(e)))
-    except Exception as e:
-        return (2, _("Error checking core: {error_message}").format(error_message=str(e)))
+    if not core_found:
+        return (1, _("Core {core_name} is not installed").format(core_name=core_name))
+    
+    # Check for available updates using get_cores_json()
+    updates_data = get_cores_json(updatable=True)
+    
+    for platform in updates_data['platforms']:
+        if platform.get('id') == core_name:
+            return (2, _("Updates found for {core_name}").format(core_name=core_name))
+    
+    return (0, _("No updates available for {core_name}").format(core_name=core_name))
     
 def reinstall_core(send_text, core_name: str) -> Tuple[bool, str]:
     """
@@ -514,36 +505,29 @@ def reinstall_core(send_text, core_name: str) -> Tuple[bool, str]:
     Returns:
         Tuple[bool, str]: (Success, Description)
     """
-    try:
-        # Update index first
-        cmd = cli_command + ['core', 'update-index']
+    cmd = _cli_command + ['core', 'update-index']
+    runCommandToWin(send_text, cmd)
+    
+    # Check if core exists using get_cores_json()
+    cores_data = get_cores_json()
+    
+    core_installed = any(
+        platform.get('id') == core_name 
+        for platform in cores_data['platforms']
+    )
+    
+    # Remove core if exists
+    if core_installed:
+        cmd = _cli_command + ['core', 'uninstall', core_name]
         runCommandToWin(send_text, cmd)
-        
-        # Check if core exists using JSON output
-        cmd = cli_command + ['--json', 'core', 'list']
-        result = runCommand(cmd)
-        cores_data = json.loads(result)
-        platforms = get_platform_list(cores_data)
-        
-        core_installed = any(
-            platform.get('id') == core_name 
-            for platform in platforms
-        )
-        
-        # Remove core if exists
-        if core_installed:
-            cmd = cli_command + ['core', 'uninstall', core_name]
-            runCommandToWin(send_text, cmd)
-        
-        # Install core
-        cmd = cli_command + ['core', 'install', core_name]
-        result = runCommandToWin(send_text, cmd)
-        if result != 0:
-            return (False, _("Core reinstallation failed."))
-        return (True, _("Core reinstallation completed.").format(result=result))
-            
-    except Exception as e:
-        return (False, _("Core reinstallation failed: {error_message}").format(error_message=str(e)))
+    
+    # Install core
+    cmd = _cli_command + ['core', 'install', core_name]
+    result = runCommandToWin(send_text, cmd)
+    if result != 0:
+        return (False, _("Core reinstallation failed."))
+    
+    return (True, _("Core reinstallation completed.").format(result=result))
 
 def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
     """
@@ -557,7 +541,7 @@ def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
     """
     try:
         # Update index
-        cmd = cli_command + ['core', 'update-index']
+        cmd = _cli_command + ['core', 'update-index']
         result = runCommandToWin(send_text, cmd)
         
         # Check status
@@ -565,7 +549,7 @@ def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
         
         if status == 0:
             # Double-check for updates with JSON output
-            cmd = cli_command + ['--json', 'core', 'list', '--updatable']
+            cmd = _cli_command + ['--json', 'core', 'list', '--updatable']
             result = runCommand(cmd)
             updates_data = json.loads(result)
             updatable_platforms = get_platform_list(updates_data)
@@ -576,7 +560,7 @@ def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
             )
             
             if core_needs_update:
-                cmd = cli_command + ['core', 'upgrade', core_name]
+                cmd = _cli_command + ['core', 'upgrade', core_name]
                 result = runCommandToWin(send_text, cmd)
                 if result != 0:
                     return (False, _("Upgrade failed."))
@@ -585,9 +569,9 @@ def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
             
         elif status == 1:
             # Perform reinstallation
-            cmd = cli_command + ['core', 'uninstall', core_name]
+            cmd = _cli_command + ['core', 'uninstall', core_name]
             runCommandToWin(send_text, cmd)
-            cmd = cli_command + ['core', 'install', core_name]
+            cmd = _cli_command + ['core', 'install', core_name]
             result = runCommandToWin(send_text, cmd)
             if result != 0:
                 return (False, _("Reinstallation failed."))
@@ -595,7 +579,7 @@ def upgrade_core(send_text, core_name: str) -> Tuple[bool, str]:
             
         elif status == 2:
             # Perform first installation
-            cmd = cli_command + ['core', 'install', core_name]
+            cmd = _cli_command + ['core', 'install', core_name]
             result = runCommandToWin(send_text, cmd)
             if result != 0:
                 return (False, _("Initial core installation failed."))
@@ -616,7 +600,7 @@ def is_board_url_configured(url: str) -> bool:
     """
     try:
         # Get current config
-        cmd = cli_command + ['config', 'dump', '--format', 'json']
+        cmd = _cli_command + ['config', 'dump', '--format', 'json']
         result = runCommand(cmd)
         
         # Parse JSON output
@@ -647,51 +631,32 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
     required_libs = OPLC_DEPS   # in the future this might take project libraries, board specific libraries and extension specific libraries too
 
     def setup_environment() -> bool:
-        global base_path, cli_command, iec_transpiler
-        base_path = 'editor/arduino/src'
-        
-        # Convert base_path to absolute path
-        base_path = os.path.abspath(base_path)
-        
         # Clear build log
-        open(os.path.join(base_path, 'build.log'), 'w').close()
+        open(os.path.join(_arduino_src_path, 'build.log'), 'w').close()
         log_host_info(send_text)
         
-        # Setup CLI command based on platform
-        if os_platform.system() == 'Windows':
-            cli_command = [os.path.abspath('editor\\arduino\\bin\\arduino-cli-w64.exe'), '--no-color']
-            iec_transpiler = os.path.abspath('editor/arduino/bin/iec2c.exe')
-        elif os_platform.system() == 'Darwin':
-            cli_command = [os.path.abspath('editor/arduino/bin/arduino-cli-mac'), '--no-color']
-            iec_transpiler = os.path.abspath('editor/arduino/bin/iec2c_mac')
-        else:
-            cli_command = [os.path.abspath('editor/arduino/bin/arduino-cli-l64'), '--no-color']
-            iec_transpiler = os.path.abspath('editor/arduino/bin/iec2c')
-            
         # Clean old files
         old_files = ['POUS.c', 'POUS.h', 'LOCATED_VARIABLES.h', 
                     'VARIABLES.csv', 'Config0.c', 'Config0.h', 'Res0.c']
         for file in old_files:
-            if os.path.exists(os.path.join(base_path, file)):
-                os.remove(os.path.join(base_path, file))
+            if os.path.exists(os.path.join(_arduino_src_path, file)):
+                os.remove(os.path.join(_arduino_src_path, file))
             
         return True
 
     def verify_prerequisites() -> bool:
-        global cli_command, iec_transpiler
         # Check MatIEC compiler
-        if not os.path.exists(iec_transpiler):
+        if not os.path.exists(_iec_transpiler):
             append_compiler_log(send_text, _("Error: iec2c compiler not found!") + '\n')
             return False
             
-        if not os.path.exists(cli_command[0]):
+        if not os.path.exists(_cli_command[0]):
             append_compiler_log(send_text, _("Error: arduino-cli not found!") + '\n')
             return False
         
         return True
 
     def handle_board_installation() -> bool:
-        global cli_command
         append_compiler_log(send_text, 'Checking Core and Board installation...\n')
         core = board_hal['core']
         core_status, message = check_core_status(core)
@@ -705,11 +670,11 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         
         if not board_installed or build_option >= BuildCacheOption.MR_PROPER:
             append_compiler_log(send_text, _("Cleaning download cache") + "...\n")
-            if runCommandToWin(send_text, cli_command + ['cache', 'clean']) != 0:
+            if runCommandToWin(send_text, _cli_command + ['cache', 'clean']) != 0:
                 return False
                 
             # Initialize config
-            runCommandToWin(send_text, cli_command + ['config', 'init'])    # ignore return value, most the time we would need '--overwrite', which is not our intent
+            runCommandToWin(send_text, _cli_command + ['config', 'init'])    # ignore return value, most the time we would need '--overwrite', which is not our intent
                 
             # Handle board manager URL if present
             if board_manager_url:
@@ -718,7 +683,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
                     ['config', 'add', 'board_manager.additional_urls', board_manager_url]
                 ]
                 for cmd in cmds:
-                    if runCommandToWin(send_text, cli_command + cmd) != 0:
+                    if runCommandToWin(send_text, _cli_command + cmd) != 0:
                         return False
             
             # Install core
@@ -766,7 +731,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         
         # Update the library index before installation
         try:
-            cmd = cli_command + ['lib', 'update-index']
+            cmd = _cli_command + ['lib', 'update-index']
             result = runCommandToWin(send_text, cmd)
         except Exception as e:
             append_compiler_log(send_text, _("Error updating library index: {error}").format(error=str(e)) + '\n')
@@ -782,7 +747,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         for lib in missing_libs:
             append_compiler_log(send_text, _("Installing library: {lib}").format(lib=lib) + '\n')
             try:
-                cmd = cli_command + ['lib', 'install', lib]
+                cmd = _cli_command + ['lib', 'install', lib]
                 result = runCommand(cmd)
             except Exception as e:
                 append_compiler_log(send_text, _("Error installing library {lib}: {error}").format(lib=lib, error=str(e)) + '\n')
@@ -802,13 +767,12 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         return True
 
     def update_libraries() -> bool:
-        global cli_command
         append_compiler_log(send_text, _('Checking Libraries status...') + '\n')
         libraries_status, message = check_libraries_status()
         append_compiler_log(send_text, f'{message}\n')
         
         if build_option >= BuildCacheOption.CLEAN_LIBS:
-            return_code = clean_libraries(send_text, cli_command)
+            return_code = clean_libraries(send_text, _cli_command)
         elif build_option >= BuildCacheOption.UPGRADE_LIBS:
             success, message = upgrade_libraries(send_text)
             if not success:
@@ -819,26 +783,26 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         return True
 
     def compile_st_file() -> bool:
-        global base_path, iec_transpiler
         append_compiler_log(send_text, _("Compiling .st file...") + '\n')
         
         # Write ST file
-        with open(f'{base_path}/plc_prog.st', 'w') as f:
+        with open(f'{_arduino_src_path}/plc_prog.st', 'w') as f:
             f.write(st_file)
             f.flush()
         
         time.sleep(0.2)  # ensure file is written
         
         # Compile based on platform
-        cmd = [iec_transpiler, '-f', '-l', '-p', 'plc_prog.st']
-        cwd = base_path
+        cmd = [_iec_transpiler, '-f', '-l', '-p', 'plc_prog.st']
+        cwd = _arduino_src_path
             
         return runCommandToWin(send_text, cmd, cwd=cwd) == 0
     
     def provide_hal_data() -> bool:
-        global base_path
+        append_compiler_log(send_text, _("Copying HAL source file...") + '\n')
+
         # Copy HAL file
-        shutil.copyfile(f'{base_path}/hal/{source_file}', f'{base_path}/arduino.cpp')
+        shutil.copyfile(f'{_arduino_src_path}/hal/{source_file}', f'{_arduino_src_path}/arduino.cpp')
         
         return True
 
@@ -848,18 +812,33 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         
         Inputs:
             definitions (list): List of definition strings
-            base_path (str): Base path for Arduino project
+            _arduino_src_path (str): Base path for Arduino project
             send_text (callable): Function to handle output messages
             
         Returns:
             bool: True if successful, False if error occurred
         """
-        defines_path = os.path.join(base_path, 'defines.h')
+        defines_path = os.path.join(_arduino_ino_base_path, 'defines.h')
+        append_compiler_log(send_text, _("Generating definitions file '{defines_h}'...").format(defines_h=defines_path) + '\n')
         
         try:
             with open(defines_path, 'w') as f:
+                # Defines from hal
+                if 'define' in board_hal:
+                    f.write('// Board defines\n')
+                    board_define = board_hal['define']
+                    # Handle both string and array cases
+                    if isinstance(board_define, str):
+                        f.write(f'#define {board_define}\n')
+                    elif isinstance(board_define, list):
+                        for define in board_define:
+                            f.write(f'#define {define}\n')
+                    
+                    f.write('\n\n')
+                            
                 content = '\n'.join(definitions)
                 f.write(content)
+                
                 f.flush()
             return True
                 
@@ -873,13 +852,13 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         
         Inputs:
             arduino_sketch (str): Arduino sketch content or None
-            base_path (str): Base path for Arduino project
+            _arduino_src_path (str): Base path for Arduino project
             send_text (callable): Function to handle output messages
             
         Returns:
             bool: True if successful or no sketch provided, False if error occurred
         """
-        sketch_path = os.path.join(base_path, 'ext', 'arduino_sketch.h')
+        sketch_path = os.path.join(_arduino_ino_base_path, 'ext', 'arduino_sketch.h')
         
             # Delete existing file if it exists
         try:
@@ -893,6 +872,8 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         if arduino_sketch is None:
             return True
             
+        append_compiler_log(send_text, _("Adding arduino sketch file {sketch_h}...").format(sketch_h=sketch_path) + '\n')
+        
         try:
             os.makedirs(os.path.dirname(sketch_path), exist_ok=True)
             with open(sketch_path, 'w') as f:
@@ -905,12 +886,11 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
             return False
     
     def generate_glue_code() -> bool:
-        global base_path
-        if not os.path.exists(f'{base_path}/LOCATED_VARIABLES.h'):
+        if not os.path.exists(f'{_arduino_src_path}/LOCATED_VARIABLES.h'):
             append_compiler_log(send_text, _("Error: Couldn't find LOCATED_VARIABLES.h") + '\n')
             return False
             
-        located_vars_file = open(f'{base_path}/LOCATED_VARIABLES.h', 'r')
+        located_vars_file = open(f'{_arduino_src_path}/LOCATED_VARIABLES.h', 'r')
         located_vars = located_vars_file.readlines()
         glueVars = """
 #include "iec_std_lib.h"
@@ -1042,7 +1022,7 @@ void updateTime()
     }
 }
 """
-        f = open(f'{base_path}/glueVars.c', 'w')
+        f = open(f'{_arduino_src_path}/glueVars.c', 'w')
         f.write(glueVars)
         f.flush()
         f.close()
@@ -1052,17 +1032,16 @@ void updateTime()
         return True
 
     def patch_generated_files() -> bool:
-        global base_path
         # Patch POUS.c
-        with open(f'{base_path}/POUS.c', 'r') as f:
+        with open(f'{_arduino_src_path}/POUS.c', 'r') as f:
             pous_content = f.read()
-        with open(f'{base_path}/POUS.c', 'w') as f:
+        with open(f'{_arduino_src_path}/POUS.c', 'w') as f:
             f.write('#include "POUS.h"\n\n' + pous_content)
             
         # Patch Res0.c
-        with open(f'{base_path}/Res0.c', 'r') as f:
+        with open(f'{_arduino_src_path}/Res0.c', 'r') as f:
             res0_lines = f.readlines()
-        with open(f'{base_path}/Res0.c', 'w') as f:
+        with open(f'{_arduino_src_path}/Res0.c', 'w') as f:
             for line in res0_lines:
                 if '#include "POUS.c"' in line:
                     f.write('#include "POUS.h"\n')
@@ -1072,10 +1051,9 @@ void updateTime()
         return True
 
     def build_project() -> bool:
-        global cli_command
         append_compiler_log(send_text, _('Generating binary file...') + '\n')
         
-        build_cmd = cli_command + ['compile', '-v']
+        build_cmd = _cli_command + ['compile', '-v']
         if build_option >= BuildCacheOption.CLEAN_BUILD:
             build_cmd.append('--clean')
             
@@ -1083,12 +1061,12 @@ void updateTime()
         # Add build flags
         extraflags = ' -MMD -c' if board_hal['core'] == 'esp32:esp32' else ''
         build_cmd.extend([
-            '--libraries=editor/arduino',
-            '--build-property', f'compiler.c.extra_flags=-Ieditor/arduino/src/lib{extraflags}',
-            '--build-property', f'compiler.cpp.extra_flags=-Ieditor/arduino/src/lib{extraflags}',
+            f"--libraries={os.path.dirname(_arduino_src_path)}",
+            '--build-property', f"compiler.c.extra_flags=-I{os.path.join(_arduino_src_path, 'lib')}{extraflags}",
+            '--build-property', f"compiler.cpp.extra_flags=-I{os.path.join(_arduino_src_path, 'lib')}{extraflags}",
             '--export-binaries',
             '-b', arduino_platform,
-            'editor/arduino/examples/Baremetal/Baremetal.ino'
+            os.path.join(_arduino_ino_base_path, 'Baremetal.ino')
         ])
         
         return runCommandToWin(send_text, build_cmd) == 0
@@ -1097,16 +1075,15 @@ void updateTime()
         if port is None:
             # Show output directory
             cwd = os.getcwd()
-            build_dir = '\\' if os_platform.system() == 'Windows' else '/'
-            build_dir = f"{cwd}{build_dir}editor{build_dir}arduino{build_dir}examples{build_dir}Baremetal{build_dir}build"
+            build_dir = f"{os.path.join(_arduino_ino_base_path, 'build')}"
             append_compiler_log(send_text, f'\n{_("OUTPUT DIRECTORY:")}:\n{build_dir}\n')
             append_compiler_log(send_text, '\n' + _('COMPILATION DONE!'))
             return True
             
         # Upload to board
         append_compiler_log(send_text, f'\n{_("Uploading program to Arduino board at {port}...")}\n')
-        cmd = cli_command + ['upload', '--port', port, '--fqbn', arduino_platform, 
-                            'editor/arduino/examples/Baremetal/']
+        cmd = _cli_command + ['upload', '--port', port, '--fqbn', arduino_platform, 
+                            _arduino_ino_base_path]
         if runCommandToWin(send_text, cmd) != 0:
             return False
             
@@ -1121,26 +1098,26 @@ void updateTime()
         return True
     
         # Clean up and return
-        if os.path.exists(base_path+'POUS.c'):
-            os.remove(base_path+'POUS.c')
-        if os.path.exists(base_path+'POUS.h'):
-            os.remove(base_path+'POUS.h')
-        if os.path.exists(base_path+'LOCATED_VARIABLES.h'):
-            os.remove(base_path+'LOCATED_VARIABLES.h')
-        if os.path.exists(base_path+'VARIABLES.csv'):
-            os.remove(base_path+'VARIABLES.csv')
-        if os.path.exists(base_path+'Config0.c'):
-            os.remove(base_path+'Config0.c')
-        if os.path.exists(base_path+'Config0.h'):
-            os.remove(base_path+'Config0.h')
-        if os.path.exists(base_path+'Config0.o'):
-            os.remove(base_path+'Config0.o')
-        if os.path.exists(base_path+'Res0.c'):
-            os.remove(base_path+'Res0.c')
-        if os.path.exists(base_path+'Res0.o'):
-            os.remove(base_path+'Res0.o')
-        if os.path.exists(base_path+'glueVars.c'):
-            os.remove(base_path+'glueVars.c')
+        if os.path.exists(_arduino_src_path+'POUS.c'):
+            os.remove(_arduino_src_path+'POUS.c')
+        if os.path.exists(_arduino_src_path+'POUS.h'):
+            os.remove(_arduino_src_path+'POUS.h')
+        if os.path.exists(_arduino_src_path+'LOCATED_VARIABLES.h'):
+            os.remove(_arduino_src_path+'LOCATED_VARIABLES.h')
+        if os.path.exists(_arduino_src_path+'VARIABLES.csv'):
+            os.remove(_arduino_src_path+'VARIABLES.csv')
+        if os.path.exists(_arduino_src_path+'Config0.c'):
+            os.remove(_arduino_src_path+'Config0.c')
+        if os.path.exists(_arduino_src_path+'Config0.h'):
+            os.remove(_arduino_src_path+'Config0.h')
+        if os.path.exists(_arduino_src_path+'Config0.o'):
+            os.remove(_arduino_src_path+'Config0.o')
+        if os.path.exists(_arduino_src_path+'Res0.c'):
+            os.remove(_arduino_src_path+'Res0.c')
+        if os.path.exists(_arduino_src_path+'Res0.o'):
+            os.remove(_arduino_src_path+'Res0.o')
+        if os.path.exists(_arduino_src_path+'glueVars.c'):
+            os.remove(_arduino_src_path+'glueVars.c')
 
 
     # Main build sequence
@@ -1165,3 +1142,28 @@ void updateTime()
         if not phase():
             return
             
+def setup_module():
+    # import global variables writable, we want set them up
+    global _arduino_src_path, _arduino_ino_base_path, _cli_command, _iec_transpiler
+    _arduino_src_path = 'editor/arduino/src'
+    _arduino_ino_base_path = 'editor/arduino/examples/Baremetal'
+    
+    # Convert _arduino_src_path to absolute path
+    _arduino_src_path = os.path.abspath(_arduino_src_path)
+    _arduino_ino_base_path = os.path.abspath(_arduino_ino_base_path)
+    
+    # Setup CLI command based on platform
+    if os_platform.system() == 'Windows':
+        _cli_command = [os.path.abspath('editor\\arduino\\bin\\arduino-cli-w64.exe'), '--no-color']
+        _iec_transpiler = os.path.abspath('editor/arduino/bin/iec2c.exe')
+    elif os_platform.system() == 'Darwin':
+        _cli_command = [os.path.abspath('editor/arduino/bin/arduino-cli-mac'), '--no-color']
+        _iec_transpiler = os.path.abspath('editor/arduino/bin/iec2c_mac')
+    else:
+        _cli_command = [os.path.abspath('editor/arduino/bin/arduino-cli-l64'), '--no-color']
+        _iec_transpiler = os.path.abspath('editor/arduino/bin/iec2c')
+        
+    return None
+
+# run this on module load time
+setup_module()
