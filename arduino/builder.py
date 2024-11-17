@@ -114,14 +114,23 @@ def runCommand(command):
         subprocess.CalledProcessError: If command execution fails
     """
     cmd_response = None
+    kwargs = {
+        'stderr': subprocess.STDOUT
+    }
+    
+    # Add Windows-specific flags to prevent console window popup
+    if os.name in ("nt", "ce"):
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
     
     try:
         if isinstance(command, str):
-            # Legacy support for string commands (deprecated)
-            cmd_response = subprocess.check_output(command, shell=True, stderr=subprocess.STDOUT)
+            # Legacy support for string commands
+            kwargs['shell'] = True
+            cmd_response = subprocess.check_output(command, **kwargs)
         else:
             # List commands executed without shell - safe for paths with spaces
-            cmd_response = subprocess.check_output(command, shell=False, stderr=subprocess.STDOUT)
+            kwargs['shell'] = False
+            cmd_response = subprocess.check_output(command, **kwargs)
             
     except subprocess.CalledProcessError as exc:
         cmd_response = exc.output
@@ -130,7 +139,6 @@ def runCommand(command):
         return ''
         
     return cmd_response.decode('utf-8', errors='backslashreplace')
-
 def read_output(process, send_text, timeout=None):
     start_time = time.time()
     return_code = 0
@@ -839,7 +847,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
                     
                     f.write('\n\n')
 
-                if arduino_sketch is not None:
+                if arduino_sketch:
                     f.write('// Project defines\n')
                     f.write('#define USE_ARDUINO_SKETCH\n')
                     f.write('#define ARDUINO_PLATFORM\n')
