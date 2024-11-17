@@ -59,7 +59,8 @@ void sketch_setup()
 void sketch_loop()
 {
 
-}"""
+}
+"""
             getattr(self.CodeFile, 'sketch').setanyText(sketch_str)
 
     def GetIconName(self):

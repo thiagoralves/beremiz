@@ -2320,13 +2320,29 @@ class ProjectController(ConfigTreeNode, PLCControler):
 
             self.generate_embed_plc_debugger()
 
-            # Get the Arduino Extension file if it exists
-            arduino_ext_path = os.path.join(self._getBuildPath(), "CFile_0.c")
-            arduino_ext_contents = None
-            if os.path.exists(arduino_ext_path):
-                f = open(arduino_ext_path)
-                arduino_ext_contents = f.read()
-                f.close()
+            # Get the Arduino Extension files if they exist
+            arduino_ext_contents = []
+            pattern = re.compile(r'CFile_(\d+)\.c$')
+
+            # Collect all matching files
+            matching_files = []
+            build_path = self._getBuildPath()
+            for filename in os.listdir(build_path):
+                if pattern.match(filename):
+                    matching_files.append(filename)
+
+            matching_files.sort(key=lambda x: int(pattern.match(x).group(1)), reverse=True) # reverse order, just to have the master code blocks in lower file numbers
+
+            # Read the content of each file
+            for filename in matching_files:
+                file_path = os.path.join(build_path, filename)
+                try:
+                    with open(file_path, 'r') as f:
+                        # Add file name as a C++ comment, followed by a blank line
+                        content = f"// PLC source file: {filename}\n\n{f.read()}"
+                        arduino_ext_contents.append(content)
+                except IOError as e:
+                    print(f"Error reading file {filename}: {e}")
 
             dialog = ArduinoUploadDialog.ArduinoUploadDialog(self.AppFrame, program, arduino_ext_contents, MD5, self)
             dialog.ShowModal()

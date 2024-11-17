@@ -41,3 +41,4 @@ doc/locale
 ^arduino/examples/Baremetal/defines.h$
 ^arduino/src/debug.c$
 ^arduino/src/glueVars.c$
+^arduino/examples/Baremetal/ext/arduino_sketch.h$

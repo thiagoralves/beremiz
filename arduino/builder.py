@@ -13,7 +13,6 @@ import select
 from typing import Tuple, Optional
 import re
 from gettext import ngettext as _n
-from pygments.styles import arduino
 # from asciidoc.a2x import cli
 
 # List of OPLC dependencies
@@ -884,8 +883,11 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         try:
             os.makedirs(os.path.dirname(sketch_path), exist_ok=True)
             with open(sketch_path, 'w') as f:
-                f.write(arduino_sketch)
+                for sketch in arduino_sketch:
+                    f.write(sketch)
+                    f.write('\n')  # Add a separating newline after each sketch fragment
                 f.flush()
+
             return True
                 
         except (IOError, OSError) as e:

@@ -21,3 +21,5 @@ arduino/examples/Baremetal/build/**
 arduino/src/debug.c
 arduino/src/glueVars.c
 /arduino/src/build.log
+arduino/examples/Baremetal/ext/arduino_sketch.h
+
