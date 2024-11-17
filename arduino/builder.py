@@ -654,6 +654,9 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
             append_compiler_log(send_text, _("Error: arduino-cli not found!") + '\n')
             return False
         
+        runCommandToWin(send_text, [_iec_transpiler, '-v'])
+        runCommandToWin(send_text, _cli_command + ['version'])
+        
         return True
 
     def handle_board_installation() -> bool:
