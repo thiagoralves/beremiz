@@ -1078,16 +1078,20 @@ void updateTime()
             build_cmd.append('--clean')
             
         # TODO: move extra build flags to board_hal
-        # Add build flags
-        extraflags = ' -MMD -c' if board_hal['core'] == 'esp32:esp32' else ''
+        if board_hal['core'] == 'esp32:esp32':
+            build_cmd.extend([
+                '--build-property', f'compiler.c.extra_flags=-MMD -c',
+                '--build-property', f'compiler.cpp.extra_flags=-MMD -c',
+            ])
         build_cmd.extend([
-            f"--libraries={os.path.dirname(_arduino_src_path)}",
-            '--build-property', f"compiler.c.extra_flags=-I{os.path.join(_arduino_src_path, 'lib')}{extraflags}",
-            '--build-property', f"compiler.cpp.extra_flags=-I{os.path.join(_arduino_src_path, 'lib')}{extraflags}",
+            # '--libraries', os.path.dirname(_arduino_src_path),
+            '--library', _arduino_src_path,
+            '--library', os.path.join(_arduino_src_path, "lib"),
             '--export-binaries',
             '-b', arduino_platform,
             os.path.join(_arduino_ino_base_path, 'Baremetal.ino')
         ])
+            
         
         return runCommandToWin(send_text, build_cmd) == 0
 
