@@ -1056,7 +1056,7 @@ void updateTime()
         with open(f'{_arduino_src_path}/POUS.c', 'r') as f:
             pous_content = f.read()
         with open(f'{_arduino_src_path}/POUS.c', 'w') as f:
-            f.write('#include "POUS.h"\n\n' + pous_content)
+            f.write('#include "POUS.h"\n#include "Config0.h"\n\n' + pous_content)
             
         # Patch Res0.c
         with open(f'{_arduino_src_path}/Res0.c', 'r') as f:
