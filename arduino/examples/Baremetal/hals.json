@@ -438,7 +438,7 @@
     "last_update": 0,
     "platform": "esp32:esp32:esp32c6",
     "source": "esp32.cpp",
-    "version": "3.0.4"
+    "version": "0"
   },
   "FX3U-14M / LE3U-14M": {
     "board_manager_url": "https://github.com/stm32duino/BoardManagerFiles/raw/main/package_stmicroelectronics_index.json",
