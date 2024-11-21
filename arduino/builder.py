@@ -1077,12 +1077,23 @@ void updateTime()
         if build_option >= BuildCacheOption.CLEAN_BUILD:
             build_cmd.append('--clean')
             
-        # TODO: move extra build flags to board_hal
-        if board_hal['core'] == 'esp32:esp32':
+        def join_flags(flags):
+            if isinstance(flags, str):
+                return flags
+            if isinstance(flags, list):
+                return ' '.join(flags)
+            return ''
+
+        # take extra build flags from board_hal
+        if 'c_flags' in board_hal:
             build_cmd.extend([
-                '--build-property', f'compiler.c.extra_flags=-MMD -c',
-                '--build-property', f'compiler.cpp.extra_flags=-MMD -c',
+                '--build-property', f'compiler.c.extra_flags={join_flags(board_hal["c_flags"])}'
             ])
+        if 'cxx_flags' in board_hal:
+            build_cmd.extend([
+                '--build-property', f'compiler.cpp.extra_flags={join_flags(board_hal["cxx_flags"])}'
+            ])
+            
         build_cmd.extend([
             # '--libraries', os.path.dirname(_arduino_src_path),
             '--library', _arduino_src_path,
