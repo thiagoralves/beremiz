@@ -1,7 +1,5 @@
-#!/bin/bash
-
-PROGDIR="$(dirname "$(readlink -f "$0")")"
-ARDUINO_CLI="$(readlink -f "$PROGDIR/../../bin/arduino-cli-l64")"
-
-# read the list of libraries
+#!/bin/sh
+# list-all-libraries.sh
+# Lists all installed Arduino libraries
+. "`dirname \"$0\"`/find-arduino-cli.sh"
 "$ARDUINO_CLI" --json lib list | jq -r '.installed_libraries[] | .library.name'

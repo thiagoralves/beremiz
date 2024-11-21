@@ -1,7 +1,5 @@
-#!/bin/bash
-
-PROGDIR="$(dirname "$(readlink -f "$0")")"
-ARDUINO_CLI="$(readlink -f "$PROGDIR/../../bin/arduino-cli-l64")"
-
-# read the list of URLs
+#!/bin/sh
+# list-all-board-manager-urls.sh
+# Lists all configured board manager URLs
+. "`dirname \"$0\"`/find-arduino-cli.sh"
 "$ARDUINO_CLI" --json config dump | jq -r '.config.board_manager.additional_urls[]'

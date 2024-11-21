@@ -1,7 +1,5 @@
-#!/bin/bash
-
-PROGDIR="$(dirname "$(readlink -f "$0")")"
-ARDUINO_CLI="$(readlink -f "$PROGDIR/../../bin/arduino-cli-l64")"
-
-# read the list of cores
+#!/bin/sh
+# list-all-cores.sh
+# Lists all installed Arduino cores
+. "`dirname \"$0\"`/find-arduino-cli.sh"
 "$ARDUINO_CLI" --json core list | jq -r '.platforms[] | "\(.id)"'
