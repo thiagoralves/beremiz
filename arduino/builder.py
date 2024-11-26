@@ -459,7 +459,7 @@ def get_core_version(core_id: str) -> Optional[str]:
             
     return None
 
-def check_core_status(core_name: str) -> Tuple[int, str]:
+def check_core_status(core_name: str, updateCheck: bool = True) -> Tuple[int, str]:
     """
     Check the status of an Arduino core using JSON output.
     
@@ -470,16 +470,17 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
         Tuple[int, str]: (Status code, Description)
         Status codes:
         0 - Up to date or no action needed
-        1 - First installation needed
-        2 - Reinstallation recommended
+        1 - Reinstallation recommended
+        2 - First installation needed
     """
-    cmd = _cli_command + ['--json', 'core', 'update-index']
-    result = runCommand(cmd)
-    update_data = json.loads(result)
-    
-    if 'error' in update_data:
-        return (2, _("Error updating core index: {error}").format(
-            error=update_data.get('error', 'Unknown error')))
+    if updateCheck:
+        cmd = _cli_command + ['--json', 'core', 'update-index']
+        result = runCommand(cmd)
+        update_data = json.loads(result)
+        
+        if 'error' in update_data:
+            return (2, _("Error updating core index: {error}").format(
+                error=update_data.get('error', 'Unknown error')))
     
     # Check if core is installed using get_cores_json()
     cores_data = get_cores_json()
@@ -491,14 +492,17 @@ def check_core_status(core_name: str) -> Tuple[int, str]:
             break
             
     if not core_found:
-        return (1, _("Core {core_name} is not installed").format(core_name=core_name))
+        return (2, _("Core {core_name} is not installed").format(core_name=core_name))
+    
+    if not updateCheck:
+        return (0, _("Core {core_name} is installed").format(core_name=core_name))
     
     # Check for available updates using get_cores_json()
     updates_data = get_cores_json(updatable=True)
     
     for platform in updates_data['platforms']:
         if platform.get('id') == core_name:
-            return (2, _("Updates found for {core_name}").format(core_name=core_name))
+            return (1, _("Updates found for {core_name}").format(core_name=core_name))
     
     return (0, _("No updates available for {core_name}").format(core_name=core_name))
     
@@ -670,7 +674,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
     def handle_board_installation() -> bool:
         append_compiler_log(send_text, 'Checking Core and Board installation...\n')
         core = board_hal['core']
-        core_status, message = check_core_status(core)
+        core_status, message = check_core_status(core, (build_option <= BuildCacheOption.USE_CACHE))
         append_compiler_log(send_text, f'{message}\n')
         
         board_manager_url = board_hal.get('board_manager_url', None)
@@ -707,7 +711,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
             board_hal['version'] = get_core_version(core)
             
         # Handle core updates based on build option
-        elif core_status >= 1 or build_option >= BuildCacheOption.UPGRADE_CORE:
+        elif core_status > 1 or build_option >= BuildCacheOption.UPGRADE_CORE:
             success, message = upgrade_core(send_text, core, core_status)
             if not success:
                 append_compiler_log(send_text, f'\n{message}\n')
@@ -778,19 +782,20 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
         return True
 
     def update_libraries() -> bool:
-        append_compiler_log(send_text, _('Checking Libraries status...') + '\n')
-        libraries_status, message = check_libraries_status()
-        append_compiler_log(send_text, f'{message}\n')
-        
-        if build_option >= BuildCacheOption.CLEAN_LIBS:
-            return_code = clean_libraries(send_text, _cli_command)
-        elif build_option >= BuildCacheOption.UPGRADE_LIBS:
-            success, message = upgrade_libraries(send_text)
-            if not success:
-                append_compiler_log(send_text, f'\n{message}\n')
-                return False
-        
-        append_compiler_log(send_text, f'\n')
+        if build_option > BuildCacheOption.USE_CACHE:
+            append_compiler_log(send_text, _('Checking Libraries status...') + '\n')
+            libraries_status, message = check_libraries_status()
+            append_compiler_log(send_text, f'{message}\n')
+            
+            if build_option >= BuildCacheOption.CLEAN_LIBS:
+                return_code = clean_libraries(send_text, _cli_command)
+            elif build_option >= BuildCacheOption.UPGRADE_LIBS:
+                success, message = upgrade_libraries(send_text)
+                if not success:
+                    append_compiler_log(send_text, f'\n{message}\n')
+                    return False
+            
+            append_compiler_log(send_text, f'\n')
         return True
 
     def compile_st_file() -> bool:
