@@ -47,7 +47,15 @@ class ArduinoUploadDialog(wx.Dialog):
         self.arduino_sketch = arduino_ext
         self.definitions = []
         self.md5 = md5
+        
         self.settings = {}
+        self.default_settings = {}
+        if os.path.exists(default_settings_file):
+            with open(default_settings_file, 'r') as f:
+                self.default_settings = json.load(f)
+        else:
+            print("Default settings file not loaded:", default_settings_file)
+
         current_dir = paths.AbsDir(__file__)
         self.com_port_combo_choices = {}
         self.project_controller = project_controller
@@ -514,9 +522,10 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.Centre( wx.BOTH )
 
-        self.reloadComboChoices(None) # Initialize the com port combo box content, accesses indirectly several elements, which need to be created completely
-
         self.loadSettings()
+        self._applySettingsToGui()
+
+        self.reloadComboChoices(None) # Initialize the com port combo box content, accesses indirectly several elements, which need to be created completely
 
         self.set_build_option(self.active_build_option)
         
@@ -729,7 +738,9 @@ class ArduinoUploadDialog(wx.Dialog):
                 self.settings['user_aout'] = self.hals[board_type]['default_aout']
     
         self.markSettingsForSave("restoreIODefaults")
-        wx.CallAfter(self.onUIChange, None)
+        
+        if event is not None:
+            wx.CallAfter(self.onUIChange, None)
 
     def set_build_option(self, saved_option: builder.BuildCacheOption):
         """
@@ -937,20 +948,21 @@ class ArduinoUploadDialog(wx.Dialog):
 
     def loadSettings(self):
         """Load settings and update GUI"""
-        self.settings = self.project_controller.GetArduinoSettings()
-    
-        if not self.settings:
-            self.restoreIODefaults(None)
-            self.restoreCommDefaults(None)
-        else:
-            # Schedule GUI update
-            wx.CallAfter(self._updateGuiFromSettings)
+        self.settings = self.project_controller.GetArduinoSettings() or self.default_settings.copy()
+        
+        # Fill missing values from defaults
+        for key in self.default_settings:
+            if key not in self.settings:
+                self.settings[key] = self.default_settings[key]
+        
+        # Check if any IO setting is missing and restore defaults if needed
+        if not all(key in self.settings for key in ['user_din', 'user_ain', 'user_dout', 'user_aout']):
+            self.restoreIODefaults(None, force_overwrite=False)
         
     def restoreCommDefaults(self, event):
-        # Read default settings from settingsDefaults.json
-        if os.path.exists(default_settings_file):
-            with open(default_settings_file, 'r') as f:
-                default_settings = json.load(f)
+        # Copy default settings
+        if self.default_settings:
+            default_settings = self.default_settings
     
             # Update only the communication-related settings
             # Preserve non-communication settings
@@ -966,12 +978,11 @@ class ArduinoUploadDialog(wx.Dialog):
     
             # inform project controller about the changes
             self.markSettingsForSave("restoreCommDefaults")
+            
+            if event is not None:
+                wx.CallAfter(self._applySettingsToGui)
 
-            wx.CallAfter(self._updateGuiFromSettings)
-        else:
-            print("Default settings file not found:", default_settings_file)
-
-    def _updateGuiFromSettings(self):
+    def _applySettingsToGui(self):
         """Update all GUI elements from self.settings"""
         # Get the correct name for the board_type
         board = self.settings['board_type'].split(' [')[0]
@@ -1019,7 +1030,7 @@ class ArduinoUploadDialog(wx.Dialog):
             return
         
         if caller:
-            print("Marking ArduinoSettings for save on behalf of", caller)
+            # print("Marking ArduinoSettings for save on behalf of", caller)
             pass
         
         self.project_controller.SetArduinoSettingsChanged()
