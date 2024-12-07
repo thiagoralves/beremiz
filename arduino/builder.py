@@ -674,7 +674,7 @@ def build(st_file, definitions, arduino_sketch, port, send_text, board_hal, buil
     def handle_board_installation() -> bool:
         append_compiler_log(send_text, 'Checking Core and Board installation...\n')
         core = board_hal['core']
-        core_status, message = check_core_status(core, (build_option <= BuildCacheOption.USE_CACHE))
+        core_status, message = check_core_status(core, (build_option > BuildCacheOption.USE_CACHE))
         append_compiler_log(send_text, f'{message}\n')
         
         board_manager_url = board_hal.get('board_manager_url', None)
