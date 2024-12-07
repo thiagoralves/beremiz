@@ -42,6 +42,7 @@ class ArduinoUploadDialog(wx.Dialog):
         @param parent: Parent wx.Window of dialog for modal
         @param st_code: Compiled PLC program as ST code.
         """
+        self.settingsInternalUpdate = True
         self.plc_program = st_code
         self.arduino_sketch = arduino_ext
         self.definitions = []
@@ -127,6 +128,8 @@ class ArduinoUploadDialog(wx.Dialog):
         # Bind events for Comboboxes and Button
         self.board_type_combo.Bind(wx.EVT_COMBOBOX, self.onBoardChange)
         self.com_port_combo.Bind(wx.EVT_COMBOBOX_DROPDOWN, self.reloadComboChoices)
+        self.com_port_combo.Bind(wx.EVT_COMBOBOX, self._updateComPort)
+        self.com_port_combo.Bind(wx.EVT_TEXT, self._updateComPort)
         self.reload_button.Bind(wx.EVT_BUTTON, self.reloadComboChoices)
 
         # Create compile only checkbox
@@ -246,7 +249,14 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.aout_txt = wx.TextCtrl( self.m_panel6, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         bSizer3.Add( self.aout_txt, 0, wx.ALL|wx.EXPAND, 5 )
+        
+        # Add event handlers for IO text fields
+        self.din_txt.Bind(wx.EVT_TEXT, self.onIOValueChange)
+        self.ain_txt.Bind(wx.EVT_TEXT, self.onIOValueChange)
+        self.dout_txt.Bind(wx.EVT_TEXT, self.onIOValueChange)
+        self.aout_txt.Bind(wx.EVT_TEXT, self.onIOValueChange)
 
+        # TODO: what purpose has m_staticText9?
         self.m_staticText9 = wx.StaticText( self.m_panel6, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText9.Wrap( -1 )
         self.m_staticText9.SetMinSize( wx.Size( -1,40 ) )
@@ -260,12 +270,6 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_button2.Bind(wx.EVT_BUTTON, self.restoreIODefaults)
 
         gSizer1.Add( self.m_button2, 0, wx.ALIGN_CENTER|wx.ALL, 5 )
-
-        self.m_button3 = wx.Button( self.m_panel6, wx.ID_ANY, _('Save Changes'), wx.DefaultPosition, wx.DefaultSize, 0 )
-        self.m_button3.SetMinSize( wx.Size( 150,30 ) )
-        self.m_button3.Bind(wx.EVT_BUTTON, self.saveSettings)
-
-        gSizer1.Add( self.m_button3, 0, wx.ALIGN_CENTER|wx.ALL, 5 )
 
         bSizer3.Add( gSizer1, 1, wx.EXPAND, 5 )
 
@@ -284,7 +288,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.check_modbus_serial = wx.CheckBox( self.m_panel7, wx.ID_ANY, _('Enable Modbus RTU (Serial)'), wx.DefaultPosition, wx.DefaultSize, 0 )
         bSizer4.Add( self.check_modbus_serial, 0, wx.ALL, 10 )
-        self.check_modbus_serial.Bind(wx.EVT_CHECKBOX, self.onUIChange)
+        self.check_modbus_serial.Bind(wx.EVT_CHECKBOX, self.updateModbusSettings)
 
         fgSizer2 = wx.FlexGridSizer( 0, 4, 0, 0 )
         fgSizer2.SetFlexibleDirection( wx.BOTH )
@@ -315,6 +319,10 @@ class ArduinoUploadDialog(wx.Dialog):
         self.baud_rate_combo.SetMinSize( wx.Size( 180,-1 ) )
 
         fgSizer2.Add( self.baud_rate_combo, 0, wx.ALL, 5 )
+        
+        # Add event handlers for Modbus Serial comboboxes
+        self.serial_iface_combo.Bind(wx.EVT_COMBOBOX, self.onCommValueChange)
+        self.baud_rate_combo.Bind(wx.EVT_COMBOBOX, self.onCommValueChange)
 
         self.m_staticText12 = wx.StaticText( self.m_panel7, wx.ID_ANY, _('Slave ID:'), wx.DefaultPosition, wx.Size( -1,-1 ), 0 )
         self.m_staticText12.Wrap( -1 )
@@ -337,7 +345,8 @@ class ArduinoUploadDialog(wx.Dialog):
         self.txpin_txt.SetMinSize( wx.Size( 180,-1 ) )
 
         fgSizer2.Add( self.txpin_txt, 0, wx.ALL, 5 )
-
+        
+        # TODO: welchen Zweck hat m_staticText23
         self.m_staticText23 = wx.StaticText( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText23.Wrap( -1 )
         self.m_staticText23.SetMaxSize( wx.Size( -1,15 ) )
@@ -352,7 +361,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
         self.check_modbus_tcp = wx.CheckBox( self.m_panel7, wx.ID_ANY, _('Enable Modbus TCP'), wx.DefaultPosition, wx.DefaultSize, 0 )
         bSizer4.Add( self.check_modbus_tcp, 0, wx.ALL, 10 )
-        self.check_modbus_tcp.Bind(wx.EVT_CHECKBOX, self.onUIChange)
+        self.check_modbus_tcp.Bind(wx.EVT_CHECKBOX, self.updateModbusSettings)
 
         fgSizer3 = wx.FlexGridSizer( 0, 2, 0, 0 )
         fgSizer3.SetFlexibleDirection( wx.BOTH )
@@ -368,7 +377,7 @@ class ArduinoUploadDialog(wx.Dialog):
         self.tcp_iface_combo = wx.ComboBox( self.m_panel7, wx.ID_ANY, u"Ethernet", wx.DefaultPosition, wx.DefaultSize, tcp_iface_comboChoices, wx.CB_READONLY )
         self.tcp_iface_combo.SetSelection( 0 )
         self.tcp_iface_combo.SetMinSize( wx.Size( 560,-1 ) )
-        self.tcp_iface_combo.Bind(wx.EVT_COMBOBOX, self.onUIChange)
+        self.tcp_iface_combo.Bind(wx.EVT_COMBOBOX, self.updateModbusSettings)
 
         fgSizer3.Add( self.tcp_iface_combo, 0, wx.ALL|wx.EXPAND, 5 )
 
@@ -459,7 +468,17 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_staticText24 = wx.StaticText( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText24.Wrap( -1 )
         fgSizer4.Add( self.m_staticText24, 0, wx.ALL, 5 )
-
+        
+        # Add event handlers for communication text fields
+        self.slaveid_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
+        self.txpin_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
+        self.mac_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
+        self.ip_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
+        self.dns_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
+        self.gateway_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
+        self.subnet_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
+        self.wifi_ssid_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
+        self.wifi_pwd_txt.Bind(wx.EVT_TEXT, self.onCommValueChange)
 
         bSizer4.Add( fgSizer4, 1, wx.EXPAND, 5 )
 
@@ -470,12 +489,6 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_button4.Bind(wx.EVT_BUTTON, self.restoreCommDefaults)
 
         gSizer2.Add( self.m_button4, 0, wx.ALIGN_CENTER|wx.ALL, 5 )
-
-        self.m_button5 = wx.Button( self.m_panel7, wx.ID_ANY, _('Save Changes'), wx.DefaultPosition, wx.DefaultSize, 0 )
-        self.m_button5.SetMinSize( wx.Size( 150,30 ) )
-        self.m_button5.Bind(wx.EVT_BUTTON, self.saveSettings)
-
-        gSizer2.Add( self.m_button5, 0, wx.ALIGN_CENTER|wx.ALL, 5 )
 
 
         bSizer4.Add( gSizer2, 1, wx.EXPAND, 5 )
@@ -506,11 +519,16 @@ class ArduinoUploadDialog(wx.Dialog):
         self.loadSettings()
 
         self.set_build_option(self.active_build_option)
+        
+        wx.YieldIfNeeded()
+        
+        self.settingsInternalUpdate = False
 
     def __del__( self ):
         pass
 
     def reloadComboChoices(self, event):
+        """Reload and update COM port choices"""
         self.setUIState(False)
         current_display = self.com_port_combo.GetValue()
         current_port = next((port for display_text, port in self.com_port_combo_choices.items()
@@ -532,17 +550,56 @@ class ArduinoUploadDialog(wx.Dialog):
             if port == current_port:
                 new_display = display_text
                 break
-
-        wx.CallAfter(self.com_port_combo.SetValue, new_display)
-
+        
+        self._updateComPort(new_display)    # restore the combobox text content
         self.setUIState(True)
-
+        
+    def _updateComPort(self, event):
+        """Update COM port selection and save settings"""
+        if isinstance(event, str):
+            # Called from reloadComboChoices
+            display_text = event
+            self.com_port_combo.SetValue(display_text)
+        else:
+            # Called from EVT_TEXT event
+            display_text = event.GetString()
+            
+        # Save the actual port value in settings
+        self.settings['com_port'] = next((port for disp, port in self.com_port_combo_choices.items()
+                                         if disp == display_text), display_text)
+        self.markSettingsForSave("_updateComPort")
+    
     def onBoardChange(self, e):
-        self.settings.pop('user_din', None);
-        self.settings.pop('user_ain', None);
-        self.settings.pop('user_dout', None);
-        self.settings.pop('user_aout', None);
+        """Handle board type changes"""
+        self.settings.pop('user_din', None)
+        self.settings.pop('user_ain', None)
+        self.settings.pop('user_dout', None)
+        self.settings.pop('user_aout', None)
+        self.markSettingsForSave("onBoardChange")
         self.onUIChange(e)
+    
+    def onIOValueChange(self, event):
+        """Handle changes in IO configuration text fields"""
+        self.settings['user_din'] = self.din_txt.GetValue()
+        self.settings['user_ain'] = self.ain_txt.GetValue()
+        self.settings['user_dout'] = self.dout_txt.GetValue()
+        self.settings['user_aout'] = self.aout_txt.GetValue()
+        self.markSettingsForSave("onIOValueChange")
+        
+    def onCommValueChange(self, event):
+        """Handle changes in communication settings fields"""
+        self.settings['slaveid'] = self.slaveid_txt.GetValue()
+        self.settings['txpin'] = self.txpin_txt.GetValue()
+        self.settings['serial_iface'] = self.serial_iface_combo.GetValue()
+        self.settings['baud'] = self.baud_rate_combo.GetValue()
+        self.settings['mac'] = self.mac_txt.GetValue()
+        self.settings['ip'] = self.ip_txt.GetValue()
+        self.settings['dns'] = self.dns_txt.GetValue()
+        self.settings['gateway'] = self.gateway_txt.GetValue()
+        self.settings['subnet'] = self.subnet_txt.GetValue()
+        self.settings['ssid'] = self.wifi_ssid_txt.GetValue()
+        self.settings['pwd'] = self.wifi_pwd_txt.GetValue()
+        self.markSettingsForSave("onCommValueChange")
 
     def onBuildCacheOptionChange(self, event):
         """
@@ -552,8 +609,20 @@ class ArduinoUploadDialog(wx.Dialog):
         selected = self.build_options.GetSelection()
         self.active_build_option = self.BUILD_OPTIONS[selected][1]
 
+    def updateModbusSettings(self, event):
+        """Update Modbus settings and trigger UI updates"""
+        
+        # Update settings
+        self.settings['mb_serial'] = self.check_modbus_serial.GetValue()
+        self.settings['mb_tcp'] = self.check_modbus_tcp.GetValue()
+        self.settings['tcp_iface'] = self.tcp_iface_combo.GetValue()
+            
+        self.markSettingsForSave("updateModbusSettings")
+        self.onUIChange(None)  # Update GUI states
+
     def onUIChange(self, e):
-        # Update Comms
+        """Update UI states based on current settings"""
+        # Update Modbus Serial controls
         if (self.check_modbus_serial.GetValue() == False):
             self.serial_iface_combo.Enable(False)
             self.baud_rate_combo.Enable(False)
@@ -565,6 +634,7 @@ class ArduinoUploadDialog(wx.Dialog):
             self.slaveid_txt.Enable(True)
             self.txpin_txt.Enable(True)
 
+        # Update Compile controls
         if (self.check_compile.GetValue() == False):
             self.com_port_combo.Enable(True)
             self.reload_button.Enable(True)
@@ -636,15 +706,30 @@ class ArduinoUploadDialog(wx.Dialog):
         self.output_text.ScrollToEnd()
         wx.CallLater(10, self.output_text.ScrollToEnd)
 
-    def restoreIODefaults(self, event):
+    def restoreIODefaults(self, event, force_overwrite=True):
+        """Restore IO default values"""
         board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
         #print(f'Restoring IO defaults for "{board_type}"')
-        self.settings['user_din'] = self.hals[board_type]['default_din']
-        self.settings['user_ain'] = self.hals[board_type]['default_ain']
-        self.settings['user_dout'] = self.hals[board_type]['default_dout']
-        self.settings['user_aout'] = self.hals[board_type]['default_aout']
-        self.onUIChange(None)
-        self.project_controller.SetArduinoSettingsChanged()
+        
+        if force_overwrite:
+            # Unconditional overwrite
+            self.settings['user_din'] = self.hals[board_type]['default_din']
+            self.settings['user_ain'] = self.hals[board_type]['default_ain']
+            self.settings['user_dout'] = self.hals[board_type]['default_dout']
+            self.settings['user_aout'] = self.hals[board_type]['default_aout']
+        else:
+            # Set only empty values
+            if not self.settings.get('user_din'):
+                self.settings['user_din'] = self.hals[board_type]['default_din']
+            if not self.settings.get('user_ain'):
+                self.settings['user_ain'] = self.hals[board_type]['default_ain']
+            if not self.settings.get('user_dout'):
+                self.settings['user_dout'] = self.hals[board_type]['default_dout'] 
+            if not self.settings.get('user_aout'):
+                self.settings['user_aout'] = self.hals[board_type]['default_aout']
+    
+        self.markSettingsForSave("restoreIODefaults")
+        wx.CallAfter(self.onUIChange, None)
 
     def set_build_option(self, saved_option: builder.BuildCacheOption):
         """
@@ -818,6 +903,7 @@ class ArduinoUploadDialog(wx.Dialog):
             self.definitions.append('#define USE_STM32CAN_BLOCK')
 
 
+    # TODO: wo rufen wir am besten auf?
     def saveSettings(self, event=None):
         self.settings['board_type'] = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
         self.settings['user_din'] = str(self.din_txt.GetValue())
@@ -847,15 +933,46 @@ class ArduinoUploadDialog(wx.Dialog):
         # Remove last_update from settings since it is now managed in hals.json
         self.settings.pop('last_update', None)
 
-        self.project_controller.SetArduinoSettingsChanged()
+        self.markSettingsForSave("saveSettings")
 
     def loadSettings(self):
+        """Load settings and update GUI"""
         self.settings = self.project_controller.GetArduinoSettings()
-
+    
         if not self.settings:
             self.restoreIODefaults(None)
             self.restoreCommDefaults(None)
+        else:
+            # Schedule GUI update
+            wx.CallAfter(self._updateGuiFromSettings)
+        
+    def restoreCommDefaults(self, event):
+        # Read default settings from settingsDefaults.json
+        if os.path.exists(default_settings_file):
+            with open(default_settings_file, 'r') as f:
+                default_settings = json.load(f)
+    
+            # Update only the communication-related settings
+            # Preserve non-communication settings
+            for key in self.settings:
+                if key not in ['mb_serial', 'serial_iface', 'baud', 'slaveid', 'txpin',
+                               'mb_tcp', 'tcp_iface', 'mac', 'ip', 'dns', 'gateway',
+                               'subnet', 'ssid', 'pwd']:
+                    default_settings[key] = self.settings[key]
+            
+            # Write the updated settings back to the settings
+            for key in default_settings:
+                self.settings[key] = default_settings[key]
+    
+            # inform project controller about the changes
+            self.markSettingsForSave("restoreCommDefaults")
 
+            wx.CallAfter(self._updateGuiFromSettings)
+        else:
+            print("Default settings file not found:", default_settings_file)
+
+    def _updateGuiFromSettings(self):
+        """Update all GUI elements from self.settings"""
         # Get the correct name for the board_type
         board = self.settings['board_type'].split(' [')[0]
         board_name = ""
@@ -864,75 +981,48 @@ class ArduinoUploadDialog(wx.Dialog):
                 board_name = board + ' [' + _('NOT INSTALLED') + ']'
             else:
                 board_name = board + ' [' + self.hals[board]['version'] + ']'
-
-        wx.CallAfter(self.board_type_combo.SetValue, board_name)
-
+    
+        # Set board and COM port
+        self.board_type_combo.SetValue(board_name)
+        
+        # Update COM port display
         com_port_value = self.settings['com_port']
         for display_text, port in self.com_port_combo_choices.items():
             if port == com_port_value:
                 com_port_value = display_text
                 break
-        wx.CallAfter(self.com_port_combo.SetValue, com_port_value)
+        self.com_port_combo.SetValue(com_port_value)
+        
+        # Update Modbus Serial Settings
+        self.check_modbus_serial.SetValue(self.settings['mb_serial'])
+        self.serial_iface_combo.SetValue(self.settings['serial_iface'])
+        self.baud_rate_combo.SetValue(self.settings['baud'])
+        self.slaveid_txt.SetValue(self.settings['slaveid'])
+        self.txpin_txt.SetValue(self.settings['txpin'])
+    
+        # Update TCP Settings
+        self.check_modbus_tcp.SetValue(self.settings['mb_tcp'])
+        self.tcp_iface_combo.SetValue(self.settings['tcp_iface'])
+        self.mac_txt.SetValue(self.settings['mac'])
+        self.ip_txt.SetValue(self.settings['ip'])
+        self.dns_txt.SetValue(self.settings['dns'])
+        self.gateway_txt.SetValue(self.settings['gateway'])
+        self.subnet_txt.SetValue(self.settings['subnet'])
+        self.wifi_ssid_txt.SetValue(self.settings['ssid'])
+        self.wifi_pwd_txt.SetValue(self.settings['pwd'])
+    
+        # Update IO fields and handle enable/disable states
+        self.onUIChange(None)
 
-        wx.CallAfter(self.check_modbus_serial.SetValue, self.settings['mb_serial'])
-        wx.CallAfter(self.serial_iface_combo.SetValue, self.settings['serial_iface'])
-        wx.CallAfter(self.baud_rate_combo.SetValue, self.settings['baud'])
-        wx.CallAfter(self.slaveid_txt.SetValue, self.settings['slaveid'])
-        wx.CallAfter(self.txpin_txt.SetValue, self.settings['txpin'])
-        wx.CallAfter(self.check_modbus_tcp.SetValue, self.settings['mb_tcp'])
-        wx.CallAfter(self.tcp_iface_combo.SetValue, self.settings['tcp_iface'])
-        wx.CallAfter(self.mac_txt.SetValue, self.settings['mac'])
-        wx.CallAfter(self.ip_txt.SetValue, self.settings['ip'])
-        wx.CallAfter(self.dns_txt.SetValue, self.settings['dns'])
-        wx.CallAfter(self.gateway_txt.SetValue, self.settings['gateway'])
-        wx.CallAfter(self.subnet_txt.SetValue, self.settings['subnet'])
-        wx.CallAfter(self.wifi_ssid_txt.SetValue, self.settings['ssid'])
-        wx.CallAfter(self.wifi_pwd_txt.SetValue, self.settings['pwd'])
-
-        wx.CallAfter(self.onUIChange, None)
-
-    def restoreCommDefaults(self, event):
-        # Read default settings from settingsDefaults.json
-        if os.path.exists(default_settings_file):
-            with open(default_settings_file, 'r') as f:
-                default_settings = json.load(f)
-
-            # Update only the communication-related settings
-            # Preserve non-communication settings
-            for key in self.settings:
-                if key not in ['mb_serial', 'serial_iface', 'baud', 'slaveid', 'txpin',
-                               'mb_tcp', 'tcp_iface', 'mac', 'ip', 'dns', 'gateway',
-                               'subnet', 'ssid', 'pwd']:
-                    default_settings[key] = self.settings[key]
-
-            # Write the updated settings back to the settings
-            for key in default_settings:
-                self.settings[key] = default_settings[key]
-
-            # inform project controller about the changes
-            self.project_controller.SetArduinoSettingsChanged()
-
-            # Use loadSettings to update the GUI
-            self.loadSettings()
-
-            # Enable all communication-related fields
-            self.serial_iface_combo.Enable(True)
-            self.baud_rate_combo.Enable(True)
-            self.slaveid_txt.Enable(True)
-            self.txpin_txt.Enable(True)
-            self.tcp_iface_combo.Enable(True)
-            self.mac_txt.Enable(True)
-            self.ip_txt.Enable(True)
-            self.dns_txt.Enable(True)
-            self.gateway_txt.Enable(True)
-            self.subnet_txt.Enable(True)
-            self.wifi_ssid_txt.Enable(True)
-            self.wifi_pwd_txt.Enable(True)
-
-            # Call onUIChange to update the state of the fields based on checkbox values
-            self.onUIChange(None)
-        else:
-            print("Default settings file not found:", default_settings_file)
+    def markSettingsForSave(self, caller: str = None):
+        if self.settingsInternalUpdate:
+            return
+        
+        if caller:
+            print("Marking ArduinoSettings for save on behalf of", caller)
+            pass
+        
+        self.project_controller.SetArduinoSettingsChanged()
 
     def loadHals(self):
         """Load HALs list from json file"""
