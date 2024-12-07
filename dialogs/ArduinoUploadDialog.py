@@ -95,7 +95,7 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_staticText1.Wrap(-1)
         top_sizer.Add(self.m_staticText1, pos=(0,0), flag=wx.ALL | wx.ALIGN_CENTER_VERTICAL | wx.ALIGN_RIGHT, border=5)
 
-        self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), board_type_comboChoices, 0)
+        self.board_type_combo = wx.ComboBox(top_panel, wx.ID_ANY, "Arduino Uno", wx.DefaultPosition, wx.Size(-1,-1), board_type_comboChoices, wx.CB_READONLY)
         top_sizer.Add(self.board_type_combo, pos=(0,1), flag=wx.ALL | wx.EXPAND, border=0)
 
         self.m_staticline1 = wx.StaticLine(top_panel, wx.ID_ANY, wx.DefaultPosition, wx.DefaultSize, wx.LI_HORIZONTAL)
@@ -264,7 +264,6 @@ class ArduinoUploadDialog(wx.Dialog):
         self.dout_txt.Bind(wx.EVT_TEXT, self.onIOValueChange)
         self.aout_txt.Bind(wx.EVT_TEXT, self.onIOValueChange)
 
-        # TODO: what purpose has m_staticText9?
         self.m_staticText9 = wx.StaticText( self.m_panel6, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText9.Wrap( -1 )
         self.m_staticText9.SetMinSize( wx.Size( -1,40 ) )
@@ -276,7 +275,8 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_button2 = wx.Button( self.m_panel6, wx.ID_ANY, _('Restore Defaults'), wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_button2.SetMinSize( wx.Size( 150,30 ) )
         self.m_button2.Bind(wx.EVT_BUTTON, self.restoreIODefaults)
-
+        
+        gSizer1.AddStretchSpacer()
         gSizer1.Add( self.m_button2, 0, wx.ALIGN_CENTER|wx.ALL, 5 )
 
         bSizer3.Add( gSizer1, 1, wx.EXPAND, 5 )
@@ -354,7 +354,6 @@ class ArduinoUploadDialog(wx.Dialog):
 
         fgSizer2.Add( self.txpin_txt, 0, wx.ALL, 5 )
         
-        # TODO: welchen Zweck hat m_staticText23
         self.m_staticText23 = wx.StaticText( self.m_panel7, wx.ID_ANY, wx.EmptyString, wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_staticText23.Wrap( -1 )
         self.m_staticText23.SetMaxSize( wx.Size( -1,15 ) )
@@ -495,7 +494,8 @@ class ArduinoUploadDialog(wx.Dialog):
         self.m_button4 = wx.Button( self.m_panel7, wx.ID_ANY, _('Restore Defaults'), wx.DefaultPosition, wx.DefaultSize, 0 )
         self.m_button4.SetMinSize( wx.Size( 150,30 ) )
         self.m_button4.Bind(wx.EVT_BUTTON, self.restoreCommDefaults)
-
+        
+        gSizer2.AddStretchSpacer()
         gSizer2.Add( self.m_button4, 0, wx.ALIGN_CENTER|wx.ALL, 5 )
 
 
@@ -514,7 +514,6 @@ class ArduinoUploadDialog(wx.Dialog):
 
 
         main_sizer.Add( self.m_listbook2, 1, wx.EXPAND |wx.ALL, 0 )
-
 
         self.SetSizer(main_sizer)
         main_sizer.Fit(self)
@@ -580,10 +579,13 @@ class ArduinoUploadDialog(wx.Dialog):
     
     def onBoardChange(self, e):
         """Handle board type changes"""
+        self.settings['board_type'] = self.board_type_combo.GetValue().split(" [")[0]
+        
         self.settings.pop('user_din', None)
         self.settings.pop('user_ain', None)
         self.settings.pop('user_dout', None)
         self.settings.pop('user_aout', None)
+        
         self.markSettingsForSave("onBoardChange")
         self.onUIChange(e)
     
@@ -677,7 +679,7 @@ class ArduinoUploadDialog(wx.Dialog):
                 self.wifi_pwd_txt.Enable(True)
 
         #Update IOs
-        board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
+        board_type = self.settings['board_type']
         if board_type not in self.hals:
             board_type = next(iter(self.hals))
         board_din = self.settings.get('user_din', self.hals[board_type]["default_din"])
@@ -717,8 +719,8 @@ class ArduinoUploadDialog(wx.Dialog):
 
     def restoreIODefaults(self, event, force_overwrite=True):
         """Restore IO default values"""
-        board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
-        #print(f'Restoring IO defaults for "{board_type}"')
+        board_type = self.settings.get('board_type')
+        # print(f'Restoring IO defaults for "{board_type}"')
         
         if force_overwrite:
             # Unconditional overwrite
@@ -741,6 +743,8 @@ class ArduinoUploadDialog(wx.Dialog):
         
         if event is not None:
             wx.CallAfter(self.onUIChange, None)
+            
+        # print(json.dumps(self.settings, indent=2))
 
     def set_build_option(self, saved_option: builder.BuildCacheOption):
         """
@@ -762,7 +766,7 @@ class ArduinoUploadDialog(wx.Dialog):
 
     def startBuilder(self):
         # Get platform and source_file from hals
-        board_type = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
+        board_type = self.settings['board_type']
         board_hal = self.hals[board_type]
 
         old_values = {
@@ -914,7 +918,6 @@ class ArduinoUploadDialog(wx.Dialog):
             self.definitions.append('#define USE_STM32CAN_BLOCK')
 
 
-    # TODO: wo rufen wir am besten auf?
     def saveSettings(self, event=None):
         self.settings['board_type'] = self.board_type_combo.GetValue().split(" [")[0] #remove the trailing [version] on board name
         self.settings['user_din'] = str(self.din_txt.GetValue())
@@ -955,9 +958,14 @@ class ArduinoUploadDialog(wx.Dialog):
             if key not in self.settings:
                 self.settings[key] = self.default_settings[key]
         
+        # normalize the board type entry from earlier editor versions
+        self.settings['board_type'] = self.settings.get('board_type').split(" [")[0]
+        
         # Check if any IO setting is missing and restore defaults if needed
         if not all(key in self.settings for key in ['user_din', 'user_ain', 'user_dout', 'user_aout']):
             self.restoreIODefaults(None, force_overwrite=False)
+        
+        # print(json.dumps(self.settings, indent=2))
         
     def restoreCommDefaults(self, event):
         # Copy default settings
