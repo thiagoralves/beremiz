@@ -17,5 +17,12 @@ arduino/src/VARIABLES.csv
 arduino/src/arduino.cpp
 arduino/src/plc_prog.st
 arduino/examples/Baremetal/defines.h
+arduino/examples/Baremetal/build/**
 arduino/src/debug.c
 arduino/src/glueVars.c
+/arduino/src/build.log
+arduino/examples/Baremetal/ext/arduino_sketch.h
+.DS_Store
+*~
+/.pydevproject
+
