@@ -46,7 +46,6 @@
 {#include "arduino.txt" }
 {#include "stm32.txt" }
 {#include "p1am.txt" }
-{#include "communication_blocks.txt" }
 
 
 {#include "MQTT.txt" }

@@ -35,12 +35,17 @@
 #include <math.h>
 #include <stdint.h>
 #include <ctype.h>
-#include <time.h>
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
+
+#if defined(__AVR__)
+typedef uint32_t time_t;
+#else
+#include <time.h>
+#endif
 
 #ifdef DEBUG_IEC
 #define DBG(...) printf(__VA_ARGS__);
@@ -64,6 +69,27 @@ typedef struct {
     u_int16_t body[STR_MAX_LEN];
 } WSTRING;
 */
+/*
+# if __WORDSIZE == 64
+#define __32b_sufix
+#define __64b_sufix L
+#else
+#define __32b_sufix L
+#define __64b_sufix LL
+#endif
+*/
+
+# if __WORDSIZE == 64
+#define __32b_sufix
+#define __64b_sufix L
+#else
+#define __32b_sufix L
+/* changed this from LL to L temporarily. It was causing a bug when compiling resulting code with gcc.
+ * I have other things to worry about at the moment.. 
+ */
+#define __64b_sufix L   
+#endif
+
 
 #define __lit(type,value,...) (type)value##__VA_ARGS__
 // Keep this macro expention step to let sfx(__VA_ARGS__) change into L or LL
@@ -72,14 +98,14 @@ typedef struct {
 #define __BOOL_LITERAL(value) __literal(BOOL,value)
 #define __SINT_LITERAL(value) __literal(SINT,value)
 #define __INT_LITERAL(value) __literal(INT,value)
-#define __DINT_LITERAL(value) __literal(DINT,INT32_C(value))
-#define __LINT_LITERAL(value) __literal(LINT,INT64_C(value))
+#define __DINT_LITERAL(value) __literal(DINT,value,__32b_sufix)
+#define __LINT_LITERAL(value) __literal(LINT,value,__64b_sufix)
 #define __USINT_LITERAL(value) __literal(USINT,value)
 #define __UINT_LITERAL(value) __literal(UINT,value)
-#define __UDINT_LITERAL(value) __literal(UDINT,UINT32_C(value))
-#define __ULINT_LITERAL(value) __literal(ULINT,UINT64_C(value))
-#define __REAL_LITERAL(value) __literal(REAL,value,f)
-#define __LREAL_LITERAL(value) __literal(LREAL,value)
+#define __UDINT_LITERAL(value) __literal(UDINT,value,__32b_sufix)
+#define __ULINT_LITERAL(value) __literal(ULINT,value,__64b_sufix)
+#define __REAL_LITERAL(value) __literal(REAL,value,__32b_sufix)
+#define __LREAL_LITERAL(value) __literal(LREAL,value,__64b_sufix)
 #define __TIME_LITERAL(value) __literal(TIME,value)
 #define __DATE_LITERAL(value) __literal(DATE,value)
 #define __TOD_LITERAL(value) __literal(TOD,value)
@@ -87,8 +113,8 @@ typedef struct {
 #define __STRING_LITERAL(count,value) (STRING){count,value}
 #define __BYTE_LITERAL(value) __literal(BYTE,value)
 #define __WORD_LITERAL(value) __literal(WORD,value)
-#define __DWORD_LITERAL(value) __literal(DWORD,UINT32_C(value))
-#define __LWORD_LITERAL(value) __literal(LWORD,UINT64_C(value))
+#define __DWORD_LITERAL(value) __literal(DWORD,value,__32b_sufix)
+#define __LWORD_LITERAL(value) __literal(LWORD,value,__64b_sufix)
 
 
 typedef union __IL_DEFVAR_T {
@@ -141,16 +167,6 @@ static inline void __iec_error(void) {
   fprintf(stderr, "IEC 61131-3 runtime error.\n");
   /*exit(1);*/
 }
-
-
-/*******************/
-/* Math Operations */
-/*******************/
-
-static inline double __expt(double in1, double in2) {
-  return pow(in1, in2);
-}
-
 
 /*******************************/
 /* Time normalization function */
@@ -215,10 +231,10 @@ static inline IEC_TIMESPEC __time_to_timespec(int sign, double mseconds, double 
  */
 #define __time_to_timespec(sign,mseconds,seconds,minutes,hours,days) \
           ((IEC_TIMESPEC){\
-              /*tv_sec  =*/ ((long int)   (((sign>=0)?1:-1)*((((long double)days*24 + (long double)hours)*60 + (long double)minutes)*60 + (long double)seconds + (long double)mseconds/1e3))), \
-              /*tv_nsec =*/ ((long int)(( \
+              /*tv_sec  =*/ ((int32_t)   (((sign>=0)?1:-1)*((((long double)days*24 + (long double)hours)*60 + (long double)minutes)*60 + (long double)seconds + (long double)mseconds/1e3))), \
+              /*tv_nsec =*/ ((int32_t)(( \
                             ((long double)(((sign>=0)?1:-1)*((((long double)days*24 + (long double)hours)*60 + (long double)minutes)*60 + (long double)seconds + (long double)mseconds/1e3))) - \
-                            ((long int)   (((sign>=0)?1:-1)*((((long double)days*24 + (long double)hours)*60 + (long double)minutes)*60 + (long double)seconds + (long double)mseconds/1e3)))   \
+                            ((int32_t)   (((sign>=0)?1:-1)*((((long double)days*24 + (long double)hours)*60 + (long double)minutes)*60 + (long double)seconds + (long double)mseconds/1e3)))   \
                             )*1e9))\
         })
 
@@ -226,7 +242,7 @@ static inline IEC_TIMESPEC __time_to_timespec(int sign, double mseconds, double 
 
 
 /* NOTE: The following function was turned into a macro, so it could be used to initialize the initial value of TOD (TIME_OF_DAY) variables */
-/* NOTE: many (but not all) of the same comments made regarding __time_to_timespec() are also valid here, so go and read those comments too!*/
+/* NOTE: many (but not all) of the same comments made regarding __time_to_timespec() are also valid here, so go and read those comments too!
 /*
 static inline IEC_TIMESPEC __tod_to_timespec(double seconds, double minutes, double hours) {
   IEC_TIMESPEC ts;
@@ -240,10 +256,10 @@ static inline IEC_TIMESPEC __tod_to_timespec(double seconds, double minutes, dou
 */
 #define __tod_to_timespec(seconds,minutes,hours) \
           ((IEC_TIMESPEC){\
-              /*tv_sec  =*/ ((long int)   ((((long double)hours)*60 + (long double)minutes)*60 + (long double)seconds)), \
-              /*tv_nsec =*/ ((long int)(( \
+              /*tv_sec  =*/ ((int32_t)   ((((long double)hours)*60 + (long double)minutes)*60 + (long double)seconds)), \
+              /*tv_nsec =*/ ((int32_t)(( \
                             ((long double)((((long double)hours)*60 + (long double)minutes)*60 + (long double)seconds)) - \
-                            ((long int)   ((((long double)hours)*60 + (long double)minutes)*60 + (long double)seconds))   \
+                            ((int32_t)   ((((long double)hours)*60 + (long double)minutes)*60 + (long double)seconds))   \
                             )*1e9))\
         })
 
@@ -298,7 +314,7 @@ static inline tm convert_seconds_to_date_and_time(long int seconds) {
 	  days += __isleap(dt.tm_year) ? 366 : 365;
   }
   dt.tm_mon = 1;
-  while (days >= __mon_yday[__isleap(dt.tm_year)][dt.tm_mon]) {
+  while (days > __mon_yday[__isleap(dt.tm_year)][dt.tm_mon]) {
 	  dt.tm_mon += 1;
   }
   dt.tm_day = days - __mon_yday[__isleap(dt.tm_year)][dt.tm_mon - 1] + 1;
@@ -449,10 +465,7 @@ static inline LINT __pstring_to_sint(STRING* IN) {
     __strlen_t l;
     unsigned int shift = 0;
 
-    if(IN->len < 1){
-        /* empty string */
-        return 0;
-    }else if(IN->len > 1 && IN->body[0]=='2' && IN->body[1]=='#'){
+    if(IN->body[0]=='2' && IN->body[1]=='#'){
         /* 2#0101_1010_1011_1111 */
         for(l = IN->len - 1; l >= 2 && shift < 64; l--)
         {
@@ -462,7 +475,7 @@ static inline LINT __pstring_to_sint(STRING* IN) {
                 shift += 1;
             }
         }
-    }else if(IN->len > 1 && IN->body[0]=='8' && IN->body[1]=='#'){
+    }else if(IN->body[0]=='8' && IN->body[1]=='#'){
         /* 8#1234_5665_4321 */
         for(l = IN->len - 1; l >= 2 && shift < 64; l--)
         {
@@ -472,7 +485,7 @@ static inline LINT __pstring_to_sint(STRING* IN) {
                 shift += 3;
             }
         }
-    }else if(IN->len > 2 && IN->body[0]=='1' && IN->body[1]=='6' && IN->body[2]=='#'){
+    }else if(IN->body[0]=='1' && IN->body[1]=='6' && IN->body[2]=='#'){
         /* 16#1234_5678_9abc_DEFG */
         for(l = IN->len - 1; l >= 3 && shift < 64; l--)
         {
@@ -491,9 +504,9 @@ static inline LINT __pstring_to_sint(STRING* IN) {
     }else{
         /* -123456789 */
         LINT fac = IN->body[0] == '-' ? -1 : 1;
-        for(l = IN->len; l > 0 && shift < 20; l--)
+        for(l = IN->len - 1; l >= 0 && shift < 20; l--)
         {
-            char c = IN->body[l-1];
+            char c = IN->body[l];
             if( c >= '0' && c <= '9'){
                 res += ( c - '0') * fac;
                 fac *= 10;
@@ -515,7 +528,7 @@ static inline LREAL __string_to_real(STRING IN) {
     __strlen_t l;
     l = IN.len;
     /* search the dot */
-    while(l > 0 && IN.body[--l] != '.');
+    while(--l > 0 && IN.body[l] != '.');
     if(l != 0){
         return atof((const char *)&IN.body);
     }else{
@@ -553,7 +566,7 @@ static inline TIME __string_to_time(STRING IN){
     /* Quick hack : only transform seconds */
     /* search the dot */
     l = IN.len;
-    while(l > 0 && IN.body[--l] != '.');
+    while(--l > 0 && IN.body[l] != '.');
     if(l != 0){
         LREAL IN_val = atof((const char *)&IN.body);
         return  (TIME){(long)IN_val, (long)(IN_val - (LINT)IN_val)*1000000000};
@@ -574,7 +587,7 @@ static inline STRING __time_to_string(TIME IN){
     div_t days;
     /*t#5d14h12m18s3.5ms*/
     res = __INIT_STRING;
-    days = div(IN.tv_sec, SECONDS_PER_DAY);
+    days = div((int)IN.tv_sec, SECONDS_PER_DAY);
     if(!days.rem && IN.tv_nsec == 0){
         res.len = snprintf((char*)&res.body, STR_MAX_LEN, "T#%dd", days.quot);
     }else{
@@ -728,12 +741,8 @@ __ANY(__move_)
 
 
 
-#include "iec_std_functions.h"
 
-#ifdef  DISABLE_EN_ENO_PARAMETERS
-  #include "iec_std_FB_no_ENENO.h"
-#else
-  #include "iec_std_FB.h"
-#endif
+#include "iec_std_functions.h"
+#include "iec_std_FB.h"
 
 #endif /* _IEC_STD_LIB_H */
