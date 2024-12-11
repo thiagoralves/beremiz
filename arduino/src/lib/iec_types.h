@@ -35,8 +35,8 @@ typedef double   IEC_LREAL;
  *          (these macros may be found in iec_std_lib.h)
  */
 typedef struct {
-    int32_t tv_sec;            /* Seconds.  */
-    int32_t tv_nsec;           /* Nanoseconds.  */
+    long int tv_sec;            /* Seconds.  */
+    long int tv_nsec;           /* Nanoseconds.  */
 } /* __attribute__((packed)) */ IEC_TIMESPEC;  /* packed is gcc specific! */
 
 typedef IEC_TIMESPEC IEC_TIME;
@@ -49,7 +49,7 @@ typedef IEC_TIMESPEC IEC_TOD;
 #endif
 
 #ifndef STR_LEN_TYPE
-#define STR_LEN_TYPE int8_t
+#define STR_LEN_TYPE uint8_t
 #endif
 
 #define __INIT_REAL 0

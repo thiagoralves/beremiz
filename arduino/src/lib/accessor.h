@@ -87,20 +87,20 @@
 #define __GET_VAR(name, ...)\
 	name.value __VA_ARGS__
 #define __GET_EXTERNAL(name, ...)\
-	((name.flags & __IEC_FORCE_FLAG) ? name.fvalue __VA_ARGS__ : (*(name.value)) __VA_ARGS__)
+	((*(name.value)) __VA_ARGS__)
 #define __GET_EXTERNAL_FB(name, ...)\
 	__GET_VAR(((*name) __VA_ARGS__))
 #define __GET_LOCATED(name, ...)\
-	((name.flags & __IEC_FORCE_FLAG) ? name.fvalue __VA_ARGS__ : (*(name.value)) __VA_ARGS__)
+	((*(name.value)) __VA_ARGS__)
 
 #define __GET_VAR_BY_REF(name, ...)\
-	((name.flags & __IEC_FORCE_FLAG) ? &(name.fvalue __VA_ARGS__) : &(name.value __VA_ARGS__))
+	(&(name.value __VA_ARGS__))
 #define __GET_EXTERNAL_BY_REF(name, ...)\
-	((name.flags & __IEC_FORCE_FLAG) ? &(name.fvalue __VA_ARGS__) : &((*(name.value)) __VA_ARGS__))
+	(&((*(name.value)) __VA_ARGS__))
 #define __GET_EXTERNAL_FB_BY_REF(name, ...)\
 	__GET_EXTERNAL_BY_REF(((*name) __VA_ARGS__))
 #define __GET_LOCATED_BY_REF(name, ...)\
-	((name.flags & __IEC_FORCE_FLAG) ? &(name.fvalue __VA_ARGS__) : &((*(name.value)) __VA_ARGS__))
+	(&((*(name.value)) __VA_ARGS__))
 
 #define __GET_VAR_REF(name, ...)\
 	(&(name.value __VA_ARGS__))
@@ -125,12 +125,12 @@
 #define __SET_VAR(prefix, name, suffix, new_value)\
 	if (!(prefix name.flags & __IEC_FORCE_FLAG)) prefix name.value suffix = new_value
 #define __SET_EXTERNAL(prefix, name, suffix, new_value)\
-	{extern IEC_BYTE __IS_GLOBAL_##name##_FORCED();\
+	{extern IEC_BYTE __IS_GLOBAL_##name##_FORCED(void);\
     if (!(prefix name.flags & __IEC_FORCE_FLAG || __IS_GLOBAL_##name##_FORCED()))\
 		(*(prefix name.value)) suffix = new_value;}
 #define __SET_EXTERNAL_FB(prefix, name, suffix, new_value)\
-	__SET_VAR((*(prefix name)), suffix, new_value)
+	__SET_VAR(prefix, name, suffix, new_value)
 #define __SET_LOCATED(prefix, name, suffix, new_value)\
-	if (!(prefix name.flags & __IEC_FORCE_FLAG)) *(prefix name.value) suffix = new_value
+	if (!(prefix name.flags & __IEC_FORCE_FLAG)) (*(prefix name.value)) suffix = new_value
 
 #endif //__ACCESSOR_H

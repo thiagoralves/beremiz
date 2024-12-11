@@ -554,12 +554,18 @@ typedef struct {
 
 
 
+
+
+
+
+
+
 static void R_TRIG_init__(R_TRIG *data__, BOOL retain) {
   __INIT_VAR(data__->EN,__BOOL_LITERAL(TRUE),retain)
   __INIT_VAR(data__->ENO,__BOOL_LITERAL(TRUE),retain)
   __INIT_VAR(data__->CLK,__BOOL_LITERAL(FALSE),retain)
   __INIT_VAR(data__->Q,__BOOL_LITERAL(FALSE),retain)
-  __INIT_VAR(data__->M,__BOOL_LITERAL(FALSE),1)
+  __INIT_VAR(data__->M,__BOOL_LITERAL(FALSE),retain)
 }
 
 // Code part
@@ -1892,7 +1898,9 @@ __end:
 
 #include "arduino_lib_FB.h"
 #include "p1am_FB.h"
+#include "communication.h"
 #include "stm32.h"
+
 #include "MQTT.h"
 #include "sm_cards.h"
 #include "jaguar.h"
